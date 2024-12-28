@@ -1,15 +1,15 @@
 package adapter
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 
 	"github.com/joho/godotenv"
-	_ "github.com/lib/pq"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
-func GetDBConnection() (*sql.DB, error) {
+func GetDBConnection() (*gorm.DB, error) {
 	err := godotenv.Load()
 	if err != nil {
 		return nil, fmt.Errorf("error loading .env file: %v", err)
@@ -22,17 +22,10 @@ func GetDBConnection() (*sql.DB, error) {
 	dbName := os.Getenv("DB_NAME")
 	sslMode := os.Getenv("DB_SSLMODE")
 
-	serviceURI := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=%s", user, password, host, port, dbName, sslMode)
-
-	db, err := sql.Open("postgres", serviceURI)
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s", host, user, password, dbName, port, sslMode)
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		return nil, fmt.Errorf("error opening database connection: %v", err)
-	}
-
-	err = db.Ping()
-	if err != nil {
-		db.Close()
-		return nil, fmt.Errorf("error testing database connection: %v", err)
 	}
 
 	return db, nil
