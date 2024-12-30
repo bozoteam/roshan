@@ -1,6 +1,8 @@
 package main
 
-import "github.com/bozoteam/roshan/src/routes"
+import (
+	routes "github.com/bozoteam/roshan/src"
+)
 
 func main() {
 	routes.RunServer()

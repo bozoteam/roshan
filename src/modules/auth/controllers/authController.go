@@ -9,7 +9,7 @@ import (
 
 	adapter "github.com/bozoteam/roshan/src/database"
 	"github.com/bozoteam/roshan/src/helpers"
-	"github.com/bozoteam/roshan/src/models"
+	"github.com/bozoteam/roshan/src/modules/user/models"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
