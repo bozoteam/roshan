@@ -32,7 +32,7 @@ func RunServer() {
 
 	if port == "" {
 		fmt.Printf("API_PORT is not set. Defaulting to 8080\n")
-		port = ":8080"
+		port = "8080"
 	}
 
 	router.Run(":" + port)
