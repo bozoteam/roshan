@@ -1,19 +1,39 @@
 package routes
 
 import (
-	"github.com/bozoteam/roshan/src/controllers"
+	"fmt"
+	"log"
+	"os"
+
 	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
-func SetupRouter() *gin.Engine {
+// RegisterRoutes registers all routes
+func RegisterRoutes() *gin.Engine {
 	router := gin.Default()
 
-	router.POST("/users", func(c *gin.Context) { controllers.CreateUser(c) })
-	router.GET("/users/:username", func(c *gin.Context) { controllers.FindUser(c) })
-	router.PUT("/users/:username", func(c *gin.Context) { controllers.UpdateUser(c) })
-	router.DELETE("/users/:username", func(c *gin.Context) { controllers.DeleteUser(c) })
+	registerUserRoutes(router)
 
-	router.POST("/auth", controllers.AuthenticateUser)
+	registerAuthRoutes(router)
 
 	return router
+}
+
+// RunServer starts the api server
+func RunServer() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("error loading .env file: %v", err)
+	}
+
+	port := os.Getenv("API_PORT")
+	router := RegisterRoutes()
+
+	if port == "" {
+		fmt.Printf("API_PORT is not set. Defaulting to 8080\n")
+		port = ":8080"
+	}
+
+	router.Run(":" + port)
 }

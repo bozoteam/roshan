@@ -5,6 +5,7 @@ CREATE TABLE users (
     name VARCHAR(255) NOT NULL,
     username VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
+    refresh_token VARCHAR(512),
     created_at TIMESTAMP,
     updated_at TIMESTAMP
 );
