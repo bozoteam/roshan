@@ -6,15 +6,18 @@ import (
 	"time"
 
 	adapter "github.com/bozoteam/roshan/src/database"
+	"github.com/bozoteam/roshan/src/helpers"
 	"github.com/bozoteam/roshan/src/modules/user/models"
 	"github.com/gin-gonic/gin"
 )
 
-// User creation handler
+// CreateUser creates a new user
 func CreateUser(context *gin.Context) {
 	db, err := adapter.GetDBConnection()
 	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
+		log.Println("Failed to connect to database:", err)
+		context.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		return
 	}
 
 	var json struct {
@@ -24,14 +27,20 @@ func CreateUser(context *gin.Context) {
 	}
 
 	if err := context.BindJSON(&json); err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		context.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
+		return
+	}
+
+	hashedPassword, err := helpers.HashPassword(json.Password)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"error": "Error hashing password"})
 		return
 	}
 
 	user := models.User{
 		Name:      json.Name,
 		Username:  json.Username,
-		Password:  json.Password,
+		Password:  hashedPassword,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}
@@ -40,19 +49,19 @@ func CreateUser(context *gin.Context) {
 		context.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	context.JSON(http.StatusCreated, gin.H{"message": "User created successfully"})
 }
 
-// User search handler
+// FindUser finds a user by username
 func FindUser(context *gin.Context) {
 	db, err := adapter.GetDBConnection()
 	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
+		log.Println("Failed to connect to database:", err)
+		context.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		return
 	}
 
 	username := context.Param("username")
-
 	var user models.User
 	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
 		context.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
@@ -62,11 +71,13 @@ func FindUser(context *gin.Context) {
 	context.JSON(http.StatusOK, user)
 }
 
-// User update handler
+// UpdateUser updates user data
 func UpdateUser(context *gin.Context) {
 	db, err := adapter.GetDBConnection()
 	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
+		log.Println("Failed to connect to database:", err)
+		context.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		return
 	}
 
 	var json struct {
@@ -94,10 +105,16 @@ func UpdateUser(context *gin.Context) {
 		user.Username = *json.Username
 	}
 	if json.Password != nil {
-		user.Password = *json.Password
+		hashedPassword, err := helpers.HashPassword(*json.Password)
+		if err != nil {
+			context.JSON(http.StatusInternalServerError, gin.H{"error": "Error hashing password"})
+			return
+		}
+		user.Password = hashedPassword
 	}
 
 	user.UpdatedAt = time.Now()
+
 	if err := db.Save(&user).Error; err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not update user"})
 		return
@@ -106,15 +123,16 @@ func UpdateUser(context *gin.Context) {
 	context.JSON(http.StatusOK, gin.H{"message": "User updated successfully"})
 }
 
-// User deletion handler
+// DeleteUser deletes a user by username
 func DeleteUser(context *gin.Context) {
 	db, err := adapter.GetDBConnection()
 	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
+		log.Println("Failed to connect to database:", err)
+		context.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		return
 	}
 
 	username := context.Param("username")
-
 	var user models.User
 	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
 		context.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
