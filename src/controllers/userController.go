@@ -70,11 +70,13 @@ func UpdateUser(context *gin.Context) {
 	}
 
 	var json struct {
-		Name string `json:"name" binding:"required"`
+		Name     *string `json:"name"`
+		Username *string `json:"username"`
+		Password *string `json:"password"`
 	}
 
 	if err := context.BindJSON(&json); err != nil {
-		context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		context.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		return
 	}
 
@@ -85,11 +87,19 @@ func UpdateUser(context *gin.Context) {
 		return
 	}
 
-	user.Name = json.Name
-	user.UpdatedAt = time.Now()
+	if json.Name != nil {
+		user.Name = *json.Name
+	}
+	if json.Username != nil {
+		user.Username = *json.Username
+	}
+	if json.Password != nil {
+		user.Password = *json.Password
+	}
 
+	user.UpdatedAt = time.Now()
 	if err := db.Save(&user).Error; err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not update user"})
 		return
 	}
 
