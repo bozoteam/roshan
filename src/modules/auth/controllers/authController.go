@@ -25,6 +25,7 @@ func init() {
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
+
 	jwtKey = []byte(os.Getenv("JWT_SECRET"))
 	refreshJwtKey = []byte(os.Getenv("JWT_REFRESH_SECRET"))
 
@@ -39,10 +40,13 @@ func init() {
 	}
 }
 
+// Authenticate authenticates a user and returns an access token and a refresh token
 func Authenticate(context *gin.Context) {
 	db, err := adapter.GetDBConnection()
 	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
+		log.Println("Failed to connect to database:", err)
+		context.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
+		return
 	}
 
 	var json struct {
@@ -56,7 +60,12 @@ func Authenticate(context *gin.Context) {
 	}
 
 	var user models.User
-	if err := db.Where("username = ? AND password = ?", json.Username, json.Password).First(&user).Error; err != nil {
+	if err := db.Where("username = ?", json.Username).First(&user).Error; err != nil {
+		context.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication failed"})
+		return
+	}
+
+	if !helpers.CheckPasswordHash(json.Password, user.Password) {
 		context.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication failed"})
 		return
 	}
@@ -85,6 +94,7 @@ func Authenticate(context *gin.Context) {
 	})
 }
 
+// Refresh generates a new access token using a refresh token
 func Refresh(context *gin.Context) {
 	db, err := adapter.GetDBConnection()
 	if err != nil {
