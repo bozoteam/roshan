@@ -10,7 +10,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func CreateUser(c *gin.Context) {
+// User creation handler
+func CreateUser(context *gin.Context) {
 	db, err := adapter.GetDBConnection()
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
@@ -22,8 +23,8 @@ func CreateUser(c *gin.Context) {
 		Password string `json:"password" binding:"required"`
 	}
 
-	if err := c.BindJSON(&json); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := context.BindJSON(&json); err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -36,31 +37,33 @@ func CreateUser(c *gin.Context) {
 	}
 
 	if err := db.Create(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		context.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "User created successfully"})
+	context.JSON(http.StatusCreated, gin.H{"message": "User created successfully"})
 }
 
-func FindUser(c *gin.Context) {
+// User search handler
+func FindUser(context *gin.Context) {
 	db, err := adapter.GetDBConnection()
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
 
-	username := c.Param("username")
+	username := context.Param("username")
 
 	var user models.User
 	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		context.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	context.JSON(http.StatusOK, user)
 }
 
-func UpdateUser(c *gin.Context) {
+// User update handler
+func UpdateUser(context *gin.Context) {
 	db, err := adapter.GetDBConnection()
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
@@ -70,15 +73,15 @@ func UpdateUser(c *gin.Context) {
 		Name string `json:"name" binding:"required"`
 	}
 
-	if err := c.BindJSON(&json); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := context.BindJSON(&json); err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	username := c.Param("username")
+	username := context.Param("username")
 	var user models.User
 	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		context.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
 
@@ -86,56 +89,32 @@ func UpdateUser(c *gin.Context) {
 	user.UpdatedAt = time.Now()
 
 	if err := db.Save(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		context.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "User updated successfully"})
+	context.JSON(http.StatusOK, gin.H{"message": "User updated successfully"})
 }
 
-func DeleteUser(c *gin.Context) {
+// User deletion handler
+func DeleteUser(context *gin.Context) {
 	db, err := adapter.GetDBConnection()
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
 
-	username := c.Param("username")
+	username := context.Param("username")
 
 	var user models.User
 	if err := db.Where("username = ?", username).First(&user).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		context.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
 
 	if err := db.Delete(&user).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		context.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
-}
-
-func AuthenticateUser(c *gin.Context) {
-	db, err := adapter.GetDBConnection()
-	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
-	}
-
-	var json struct {
-		Username string `json:"username" binding:"required"`
-		Password string `json:"password" binding:"required"`
-	}
-
-	if err := c.BindJSON(&json); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	var user models.User
-	if err := db.Where("username = ? AND password = ?", json.Username, json.Password).First(&user).Error; err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication failed"})
-		return
-	}
-
-	c.JSON(http.StatusOK, gin.H{"message": "Authenticated successfully"})
+	context.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
 }
