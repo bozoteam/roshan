@@ -68,7 +68,11 @@ func FindUser(context *gin.Context) {
 		return
 	}
 
-	context.JSON(http.StatusOK, user)
+	context.JSON(http.StatusOK, gin.H{
+		"id":       user.ID,
+		"name":     user.Name,
+		"username": user.Username,
+	})
 }
 
 // UpdateUser updates user data
