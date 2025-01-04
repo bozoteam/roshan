@@ -7,6 +7,7 @@ import (
 
 	authRouter "github.com/bozoteam/roshan/src/modules/auth/routes"
 	userRouter "github.com/bozoteam/roshan/src/modules/user/routes"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
 )
@@ -14,6 +15,16 @@ import (
 // RegisterRoutes registers all routes
 func RegisterRoutes() *gin.Engine {
 	router := gin.Default()
+
+	// Configure CORS
+	config := cors.DefaultConfig()
+	config.AllowOrigins = []string{"http://localhost:5173"} // specify allowed origins
+	config.AllowHeaders = []string{"Origin", "Content-Length", "Content-Type", "Authorization"}
+	config.AllowMethods = []string{"GET", "POST", "PUT", "DELETE"}
+	config.AllowCredentials = true
+
+	router.Use(cors.New(config))
+
 	userRouter.RegisterUserRoutes(router)
 	authRouter.RegisterAuthRoutes(router)
 	return router
