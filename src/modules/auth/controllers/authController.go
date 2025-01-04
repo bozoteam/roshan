@@ -88,9 +88,10 @@ func Authenticate(context *gin.Context) {
 		return
 	}
 
+	context.SetCookie("refresh_token", refreshTokenString, int(refreshTokenDuration*3600), "/", "", false, true)
 	context.JSON(http.StatusOK, gin.H{
 		"access_token":  accessTokenString,
-		"refresh_token": refreshTokenString,
+		// "refresh_token": refreshTokenString,
 	})
 }
 
