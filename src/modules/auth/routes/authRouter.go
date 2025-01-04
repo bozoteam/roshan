@@ -11,4 +11,5 @@ func RegisterAuthRoutes(router *gin.Engine) {
 	// Authentication routes
 	router.POST("/auth", controllers.Authenticate)
 	router.POST("/auth/refresh", controllers.Refresh)
+	router.GET("/auth/me", controllers.GetLoggedInUser)
 }

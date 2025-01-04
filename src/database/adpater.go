@@ -15,7 +15,7 @@ var (
 )
 
 // GetDBConnection returns a singleton instance of a database connection
-func GetDBConnection() (*gorm.DB, error) {
+func GetDBConnection() *gorm.DB {
 	var err error
 
 	dbOnce.Do(func() {
@@ -37,5 +37,5 @@ func GetDBConnection() (*gorm.DB, error) {
 		}
 	})
 
-	return dbInstance, err
+	return dbInstance
 }

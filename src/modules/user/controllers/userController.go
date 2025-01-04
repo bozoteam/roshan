@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"log"
 	"net/http"
 	"time"
 
@@ -13,12 +12,7 @@ import (
 
 // CreateUser creates a new user
 func CreateUser(context *gin.Context) {
-	db, err := adapter.GetDBConnection()
-	if err != nil {
-		log.Println("Failed to connect to database:", err)
-		context.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
-		return
-	}
+	db := adapter.GetDBConnection()
 
 	var json struct {
 		Name     string `json:"name" binding:"required"`
@@ -54,12 +48,7 @@ func CreateUser(context *gin.Context) {
 
 // FindUser finds a user by username
 func FindUser(context *gin.Context) {
-	db, err := adapter.GetDBConnection()
-	if err != nil {
-		log.Println("Failed to connect to database:", err)
-		context.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
-		return
-	}
+	db := adapter.GetDBConnection()
 
 	username := context.Param("username")
 	var user models.User
@@ -77,12 +66,7 @@ func FindUser(context *gin.Context) {
 
 // UpdateUser updates user data
 func UpdateUser(context *gin.Context) {
-	db, err := adapter.GetDBConnection()
-	if err != nil {
-		log.Println("Failed to connect to database:", err)
-		context.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
-		return
-	}
+	db := adapter.GetDBConnection()
 
 	var json struct {
 		Name     *string `json:"name"`
@@ -129,12 +113,7 @@ func UpdateUser(context *gin.Context) {
 
 // DeleteUser deletes a user by username
 func DeleteUser(context *gin.Context) {
-	db, err := adapter.GetDBConnection()
-	if err != nil {
-		log.Println("Failed to connect to database:", err)
-		context.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
-		return
-	}
+	db := adapter.GetDBConnection()
 
 	username := context.Param("username")
 	var user models.User
