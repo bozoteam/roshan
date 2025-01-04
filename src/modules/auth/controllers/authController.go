@@ -3,8 +3,6 @@ package controllers
 import (
 	"log"
 	"net/http"
-	"os"
-	"strconv"
 	"time"
 
 	adapter "github.com/bozoteam/roshan/src/database"
@@ -12,7 +10,6 @@ import (
 	"github.com/bozoteam/roshan/src/modules/user/models"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 )
 
 var jwtKey []byte
@@ -21,23 +18,10 @@ var tokenDuration int64
 var refreshTokenDuration int64
 
 func init() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	jwtKey = []byte(os.Getenv("JWT_SECRET"))
-	refreshJwtKey = []byte(os.Getenv("JWT_REFRESH_SECRET"))
-
-	tokenDuration, err = strconv.ParseInt(os.Getenv("JWT_TOKEN_EXPIRATION"), 10, 64)
-	if err != nil {
-		log.Fatalf("Invalid JWT_TOKEN_EXPIRATION: %v", err)
-	}
-
-	refreshTokenDuration, err = strconv.ParseInt(os.Getenv("JWT_REFRESH_TOKEN_EXPIRATION"), 10, 64)
-	if err != nil {
-		log.Fatalf("Invalid JWT_REFRESH_TOKEN_EXPIRATION: %v", err)
-	}
+	jwtKey = []byte(helpers.GetEnv("JWT_SECRET"))
+	refreshJwtKey = []byte(helpers.GetEnv("JWT_REFRESH_SECRET"))
+	tokenDuration = helpers.GetEnvAsInt("JWT_TOKEN_EXPIRATION")
+	refreshTokenDuration = helpers.GetEnvAsInt("JWT_REFRESH_TOKEN_EXPIRATION")
 }
 
 // Authenticate authenticates a user and returns an access token and a refresh token
@@ -90,8 +74,7 @@ func Authenticate(context *gin.Context) {
 
 	context.SetCookie("refresh_token", refreshTokenString, int(refreshTokenDuration*3600), "/", "", false, true)
 	context.JSON(http.StatusOK, gin.H{
-		"access_token":  accessTokenString,
-		// "refresh_token": refreshTokenString,
+		"access_token": accessTokenString,
 	})
 }
 

@@ -2,10 +2,9 @@ package adapter
 
 import (
 	"fmt"
-	"os"
 	"sync"
 
-	"github.com/joho/godotenv"
+	"github.com/bozoteam/roshan/src/helpers"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -18,19 +17,19 @@ var (
 // GetDBConnection returns a singleton instance of a database connection
 func GetDBConnection() (*gorm.DB, error) {
 	var err error
+
 	dbOnce.Do(func() {
-		err = godotenv.Load()
-		if err != nil {
-			err = fmt.Errorf("error loading .env file: %v", err)
-			return
-		}
-		user := os.Getenv("DB_USER")
-		password := os.Getenv("DB_PASSWORD")
-		host := os.Getenv("DB_HOST")
-		port := os.Getenv("DB_PORT")
-		dbName := os.Getenv("DB_NAME")
-		sslMode := os.Getenv("DB_SSLMODE")
-		dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s", host, user, password, dbName, port, sslMode)
+		user := helpers.GetEnv("DB_USER")
+		password := helpers.GetEnv("DB_PASSWORD")
+		host := helpers.GetEnv("DB_HOST")
+		port := helpers.GetEnv("DB_PORT")
+		dbName := helpers.GetEnv("DB_NAME")
+		sslMode := helpers.GetEnv("DB_SSLMODE")
+
+		dsn := fmt.Sprintf(
+			"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
+			host, user, password, dbName, port, sslMode,
+		)
 
 		dbInstance, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
 		if err != nil {

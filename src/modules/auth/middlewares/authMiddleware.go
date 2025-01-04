@@ -1,33 +1,22 @@
 package middlewares
 
 import (
-	"log"
 	"net/http"
-	"os"
 
+	"github.com/bozoteam/roshan/src/helpers"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 )
 
 var jwtKey []byte
 
 func init() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	jwtKey = []byte(os.Getenv("JWT_SECRET"))
-
-	if jwtKey == nil {
-		log.Fatal("JWT secrets not set in .env file")
-	}
+	jwtKey = []byte(helpers.GetEnv("JWT_SECRET"))
 }
+
 func AuthMiddleware() gin.HandlerFunc {
 	return func(context *gin.Context) {
 		tokenString := context.GetHeader("Authorization")
-
 		if tokenString == "" {
 			context.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing"})
 			context.Abort()
