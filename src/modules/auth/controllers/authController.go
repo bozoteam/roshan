@@ -1,7 +1,6 @@
 package controllers
 
 import (
-	"log"
 	"net/http"
 	"time"
 
@@ -26,12 +25,7 @@ func init() {
 
 // Authenticate authenticates a user and returns an access token and a refresh token
 func Authenticate(context *gin.Context) {
-	db, err := adapter.GetDBConnection()
-	if err != nil {
-		log.Println("Failed to connect to database:", err)
-		context.JSON(http.StatusInternalServerError, gin.H{"error": "Database connection error"})
-		return
-	}
+	db := adapter.GetDBConnection()
 
 	var json struct {
 		Username string `json:"username" binding:"required"`
@@ -80,10 +74,7 @@ func Authenticate(context *gin.Context) {
 
 // Refresh generates a new access token using a refresh token
 func Refresh(context *gin.Context) {
-	db, err := adapter.GetDBConnection()
-	if err != nil {
-		log.Fatal("Failed to connect to database:", err)
-	}
+	db := adapter.GetDBConnection()
 
 	var json struct {
 		RefreshToken string `json:"refresh_token" binding:"required"`
@@ -117,4 +108,37 @@ func Refresh(context *gin.Context) {
 	}
 
 	context.JSON(http.StatusOK, gin.H{"access_token": accessTokenString})
+}
+
+// GetLoggedInUser returns the user data of the logged in user
+func GetLoggedInUser(context *gin.Context) {
+	tokenString := context.GetHeader("Authorization")
+	if tokenString == "" {
+		context.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing"})
+		return
+	}
+
+	claims := &jwt.StandardClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		return jwtKey, nil
+	})
+
+	if err != nil || !token.Valid {
+		context.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		return
+	}
+
+	db := adapter.GetDBConnection()
+
+	var user models.User
+	if err := db.Where("username = ?", claims.Subject).First(&user).Error; err != nil {
+		context.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	context.JSON(http.StatusOK, gin.H{
+		"id":       user.ID,
+		"name":     user.Name,
+		"username": user.Username,
+	})
 }
