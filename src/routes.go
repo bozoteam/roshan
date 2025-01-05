@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"strings"
 
+	adapter "github.com/bozoteam/roshan/src/database"
 	"github.com/bozoteam/roshan/src/helpers"
+	"github.com/bozoteam/roshan/src/modules/auth/controllers"
 	authRouter "github.com/bozoteam/roshan/src/modules/auth/routes"
-	userRouter "github.com/bozoteam/roshan/src/modules/user/routes"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
@@ -24,8 +25,12 @@ func RegisterRoutes() *gin.Engine {
 	config.AllowCredentials = true
 	router.Use(cors.New(config))
 
-	userRouter.RegisterUserRoutes(router)
-	authRouter.RegisterAuthRoutes(router)
+	db := adapter.GetDBConnection()
+	jwtConf := controllers.NewJWTConfig()
+	authController := controllers.NewAuthController(db, jwtConf)
+
+	authRouter.RegisterAuthRoutes(router, authController)
+
 	return router
 }
 
