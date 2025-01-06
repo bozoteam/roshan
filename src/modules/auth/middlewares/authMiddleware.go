@@ -3,18 +3,20 @@ package middlewares
 import (
 	"net/http"
 
-	"github.com/bozoteam/roshan/src/helpers"
-	"github.com/dgrijalva/jwt-go"
+	"github.com/bozoteam/roshan/src/modules/auth/controllers"
 	"github.com/gin-gonic/gin"
+	"github.com/golang-jwt/jwt/v5"
 )
 
-var jwtKey []byte
-
-func init() {
-	jwtKey = []byte(helpers.GetEnv("JWT_SECRET"))
+type AuthMiddleware struct {
+	jwtConfig *controllers.JWTConfig
 }
 
-func AuthMiddleware() gin.HandlerFunc {
+func NewAuthMiddleware(jwtConf *controllers.JWTConfig) *AuthMiddleware {
+	return &AuthMiddleware{jwtConfig: jwtConf}
+}
+
+func (m *AuthMiddleware) AuthReqUser() gin.HandlerFunc {
 	return func(context *gin.Context) {
 		tokenString := context.GetHeader("Authorization")
 		if tokenString == "" {
@@ -23,18 +25,21 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		claims := &jwt.StandardClaims{}
-		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-			return jwtKey, nil
-		})
-
+		token, err := jwt.Parse(tokenString, m.jwtConfig.GetTokenKeyFunc)
 		if err != nil || !token.Valid {
 			context.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			context.Abort()
 			return
 		}
 
-		context.Set("username", claims.Subject)
+		subject, err := token.Claims.GetSubject()
+		if err != nil {
+			context.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			context.Abort()
+			return
+		}
+
+		context.Set("username", subject)
 		context.Next()
 	}
 }
