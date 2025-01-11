@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/bozoteam/roshan/src/helpers"
-	userDAO "github.com/bozoteam/roshan/src/modules/user/dao"
+	userDAO "github.com/bozoteam/roshan/src/modules/user/DAO"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
 )

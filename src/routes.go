@@ -6,6 +6,7 @@ import (
 
 	"github.com/bozoteam/roshan/src/helpers"
 	authRouter "github.com/bozoteam/roshan/src/modules/auth/routes"
+	chatRouter "github.com/bozoteam/roshan/src/modules/chat/routes"
 	userRouter "github.com/bozoteam/roshan/src/modules/user/routes"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -26,6 +27,7 @@ func RegisterRoutes() *gin.Engine {
 
 	userRouter.RegisterUserRoutes(router)
 	authRouter.RegisterAuthRoutes(router)
+	chatRouter.RegisterChatRoutes(router)
 	return router
 }
 
