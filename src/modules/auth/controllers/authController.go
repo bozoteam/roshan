@@ -5,9 +5,9 @@ import (
 	"time"
 
 	"github.com/bozoteam/roshan/src/helpers"
-	"github.com/bozoteam/roshan/src/modules/user/models"
+	userDAO "github.com/bozoteam/roshan/src/modules/user/DAO"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
+	jwt "github.com/golang-jwt/jwt/v5"
 	"gorm.io/gorm"
 )
 
@@ -58,19 +58,13 @@ func (c *AuthController) Authenticate(context *gin.Context) {
 		Username string `json:"username" binding:"required"`
 		Password string `json:"password" binding:"required"`
 	}
-
 	if err := context.BindJSON(&json); err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		return
 	}
 
-	var user models.User
-	if err := c.db.Where("username = ?", json.Username).First(&user).Error; err != nil {
-		context.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication failed"})
-		return
-	}
-
-	if !helpers.CheckPasswordHash(json.Password, user.Password) {
+	user, err := userDAO.FindUserByUsername(json.Username)
+	if err != nil || !helpers.CheckPasswordHash(json.Password, user.Password) {
 		context.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication failed"})
 		return
 	}
@@ -88,7 +82,7 @@ func (c *AuthController) Authenticate(context *gin.Context) {
 	}
 
 	user.RefreshToken = refreshTokenString
-	if err := c.db.Save(&user).Error; err != nil {
+	if err := userDAO.SaveUser(user); err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not save refresh token"})
 		return
 	}
@@ -104,7 +98,6 @@ func (c *AuthController) Refresh(context *gin.Context) {
 	var json struct {
 		RefreshToken string `json:"refresh_token" binding:"required"`
 	}
-
 	if err := context.BindJSON(&json); err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		return
@@ -122,9 +115,8 @@ func (c *AuthController) Refresh(context *gin.Context) {
 		context.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
 		return
 	}
-
-	var user models.User
-	if err := c.db.Where("username = ? AND refresh_token = ?", subject, json.RefreshToken).First(&user).Error; err != nil {
+	user, err := userDAO.FindUserByUsernameAndToken(subject, json.RefreshToken)
+	if err != nil {
 		context.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
 		return
 	}
@@ -158,8 +150,8 @@ func (c *AuthController) GetLoggedInUser(context *gin.Context) {
 		return
 	}
 
-	var user models.User
-	if err := c.db.Where("username = ?", subject).First(&user).Error; err != nil {
+	user, err := userDAO.FindUserByUsername(subject)
+	if err != nil {
 		context.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}

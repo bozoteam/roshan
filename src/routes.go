@@ -6,8 +6,12 @@ import (
 
 	adapter "github.com/bozoteam/roshan/src/database"
 	"github.com/bozoteam/roshan/src/helpers"
-	"github.com/bozoteam/roshan/src/modules/auth/controllers"
+	authControllers "github.com/bozoteam/roshan/src/modules/auth/controllers"
+	"github.com/bozoteam/roshan/src/modules/auth/middlewares"
 	authRouter "github.com/bozoteam/roshan/src/modules/auth/routes"
+	chatControllers "github.com/bozoteam/roshan/src/modules/chat/controllers"
+	chatRouter "github.com/bozoteam/roshan/src/modules/chat/routes"
+	userRouter "github.com/bozoteam/roshan/src/modules/user/routes"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 )
@@ -26,11 +30,16 @@ func RegisterRoutes() *gin.Engine {
 	router.Use(cors.New(config))
 
 	db := adapter.GetDBConnection()
-	jwtConf := controllers.NewJWTConfig()
-	authController := controllers.NewAuthController(db, jwtConf)
+	jwtConf := authControllers.NewJWTConfig()
+	authController := authControllers.NewAuthController(db, jwtConf)
+	authMiddleware := middlewares.NewAuthMiddleware(jwtConf)
+	chatController := chatControllers.NewChatController()
 
 	authRouter.RegisterAuthRoutes(router, authController)
 
+	userRouter.RegisterUserRoutes(router, jwtConf, db)
+	authRouter.RegisterAuthRoutes(router, authController)
+	chatRouter.RegisterChatRoutes(router, authMiddleware, chatController)
 	return router
 }
 
