@@ -35,8 +35,6 @@ func RegisterRoutes() *gin.Engine {
 	authMiddleware := middlewares.NewAuthMiddleware(jwtConf)
 	chatController := chatControllers.NewChatController()
 
-	authRouter.RegisterAuthRoutes(router, authController)
-
 	userRouter.RegisterUserRoutes(router, jwtConf, db)
 	authRouter.RegisterAuthRoutes(router, authController)
 	chatRouter.RegisterChatRoutes(router, authMiddleware, chatController)
