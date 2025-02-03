@@ -27,17 +27,20 @@ type JWTConfig struct {
 	refreshTokenDuration int64
 }
 
-// func (j *JWTConfig) Parse(token string) (*jwt.Token, error) {
-// 	return jwt.Parse(token, j.GetTokenKeyFunc)
-// }
-
 type AuthController struct {
 	db        *gorm.DB
 	jwtConfig *JWTConfig
 }
 
 func NewAuthController(db *gorm.DB, jwtConf *JWTConfig) *AuthController {
-	return &AuthController{db: db}
+	return &AuthController{
+		db:        db,
+		jwtConfig: jwtConf,
+	}
+}
+
+func (c *JWTConfig) GetRefreshTokenKeyFunc(token *jwt.Token) (interface{}, error) {
+	return c.refreshKey, nil
 }
 
 func (c *JWTConfig) GetTokenKeyFunc(token *jwt.Token) (interface{}, error) {
@@ -103,18 +106,19 @@ func (c *AuthController) Refresh(context *gin.Context) {
 		return
 	}
 
-	token, err := jwt.ParseWithClaims(json.RefreshToken, nil, c.jwtConfig.GetTokenKeyFunc)
-
+	var claims jwt.RegisteredClaims
+	token, err := jwt.ParseWithClaims(json.RefreshToken, &claims, c.jwtConfig.GetRefreshTokenKeyFunc)
 	if err != nil || !token.Valid {
 		context.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
 		return
 	}
 
-	subject, err := token.Claims.GetSubject()
-	if err != nil {
+	subject := claims.Subject
+	if subject == "" {
 		context.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
 		return
 	}
+
 	user, err := userDAO.FindUserByUsernameAndToken(subject, json.RefreshToken)
 	if err != nil {
 		context.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
@@ -126,7 +130,6 @@ func (c *AuthController) Refresh(context *gin.Context) {
 		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate access token"})
 		return
 	}
-
 	context.JSON(http.StatusOK, gin.H{"access_token": accessTokenString})
 }
 
@@ -138,7 +141,8 @@ func (c *AuthController) GetLoggedInUser(context *gin.Context) {
 		return
 	}
 
-	token, err := jwt.ParseWithClaims(tokenString, nil, c.jwtConfig.GetTokenKeyFunc)
+	var claims jwt.RegisteredClaims
+	token, err := jwt.ParseWithClaims(tokenString, &claims, c.jwtConfig.GetTokenKeyFunc)
 	if err != nil || !token.Valid {
 		context.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 		return
