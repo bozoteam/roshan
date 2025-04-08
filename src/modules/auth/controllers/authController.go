@@ -6,7 +6,7 @@ import (
 
 	"github.com/bozoteam/roshan/src/helpers"
 	"github.com/bozoteam/roshan/src/modules/user/models"
-	userDAO "github.com/bozoteam/roshan/src/modules/user/repository"
+	userRepository "github.com/bozoteam/roshan/src/modules/user/repository"
 	"github.com/gin-gonic/gin"
 	jwt "github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -32,14 +32,14 @@ type JWTConfig struct {
 type AuthController struct {
 	db        *gorm.DB
 	jwtConfig *JWTConfig
-	userRepo  *userDAO.UserRepository
+	userRepo  *userRepository.UserRepository
 }
 
 func NewAuthController(db *gorm.DB, jwtConf *JWTConfig) *AuthController {
 	return &AuthController{
 		db:        db,
 		jwtConfig: jwtConf,
-		userRepo:  userDAO.NewUserRepository(db),
+		userRepo:  userRepository.NewUserRepository(db),
 	}
 }
 
