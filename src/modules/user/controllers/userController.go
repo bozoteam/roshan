@@ -1,9 +1,11 @@
 package controllers
 
 import (
+	"log/slog"
 	"net/http"
 
 	"github.com/bozoteam/roshan/src/helpers"
+	log "github.com/bozoteam/roshan/src/log"
 	"github.com/bozoteam/roshan/src/modules/user/models"
 	userRepository "github.com/bozoteam/roshan/src/modules/user/repository"
 	"github.com/gin-gonic/gin"
@@ -12,11 +14,12 @@ import (
 )
 
 type UserController struct {
+	logger   *slog.Logger
 	userRepo *userRepository.UserRepository
 }
 
 func NewUserController(db *gorm.DB) *UserController {
-	return &UserController{userRepo: userRepository.NewUserRepository(db)}
+	return &UserController{userRepo: userRepository.NewUserRepository(db), logger: log.WithModule("user_controller")}
 }
 
 // CreateUser creates a new user

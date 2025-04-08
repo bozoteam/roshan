@@ -1,10 +1,12 @@
 package controllers
 
 import (
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/bozoteam/roshan/src/helpers"
+	log "github.com/bozoteam/roshan/src/log"
 	"github.com/bozoteam/roshan/src/modules/user/models"
 	userRepository "github.com/bozoteam/roshan/src/modules/user/repository"
 	"github.com/gin-gonic/gin"
@@ -30,6 +32,8 @@ type JWTConfig struct {
 }
 
 type AuthController struct {
+	logger *slog.Logger
+
 	db        *gorm.DB
 	jwtConfig *JWTConfig
 	userRepo  *userRepository.UserRepository
@@ -37,6 +41,7 @@ type AuthController struct {
 
 func NewAuthController(db *gorm.DB, jwtConf *JWTConfig) *AuthController {
 	return &AuthController{
+		logger:    log.WithModule("auth_controller"),
 		db:        db,
 		jwtConfig: jwtConf,
 		userRepo:  userRepository.NewUserRepository(db),

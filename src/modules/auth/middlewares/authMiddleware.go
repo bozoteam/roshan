@@ -1,9 +1,11 @@
 package middlewares
 
 import (
+	"log/slog"
 	"net/http"
 	"strings"
 
+	log "github.com/bozoteam/roshan/src/log"
 	"github.com/bozoteam/roshan/src/modules/auth/controllers"
 	models "github.com/bozoteam/roshan/src/modules/user/models"
 	"github.com/gin-gonic/gin"
@@ -12,12 +14,13 @@ import (
 )
 
 type AuthMiddleware struct {
+	logger    *slog.Logger
 	jwtConfig *controllers.JWTConfig
 	db        *gorm.DB
 }
 
 func NewAuthMiddleware(jwtConf *controllers.JWTConfig, db *gorm.DB) *AuthMiddleware {
-	return &AuthMiddleware{jwtConfig: jwtConf, db: db}
+	return &AuthMiddleware{jwtConfig: jwtConf, db: db, logger: log.WithModule("auth_middleware")}
 }
 
 func (m *AuthMiddleware) AuthReqUser() gin.HandlerFunc {

@@ -1,16 +1,20 @@
 package repository
 
 import (
+	"log/slog"
+
+	log "github.com/bozoteam/roshan/src/log"
 	"github.com/bozoteam/roshan/src/modules/user/models"
 	"gorm.io/gorm"
 )
 
 func NewUserRepository(db *gorm.DB) *UserRepository {
-	return &UserRepository{db: db}
+	return &UserRepository{db: db, logger: log.WithModule("user_repository")}
 }
 
 type UserRepository struct {
-	db *gorm.DB
+	logger *slog.Logger
+	db     *gorm.DB
 }
 
 func (c *UserRepository) FindUserByEmail(email string) (*models.User, error) {
