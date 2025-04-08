@@ -41,19 +41,19 @@ func (c *UserController) CreateUser(context *gin.Context) {
 	if err != nil {
 		panic(err)
 	}
-	user := models.User{
+	user := &models.User{
 		Id:       id.String(),
 		Name:     json.Name,
 		Email:    json.Email,
 		Password: hashedPassword,
 	}
 
-	if err := models.ValidateUser(&user); err != nil {
+	if err := models.ValidateUser(user); err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user data"})
 		return
 	}
 
-	if err := c.userRepo.SaveUser(&user); err != nil {
+	if err := c.userRepo.SaveUser(user); err != nil {
 		if helpers.IsErrorCode(err, "23505") {
 			context.JSON(http.StatusBadRequest, gin.H{"error": "User already exists"})
 			return
