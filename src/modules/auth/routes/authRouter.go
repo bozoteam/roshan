@@ -6,10 +6,10 @@ import (
 )
 
 // registerAuthRoutes registers authentication routes
-func RegisterAuthRoutes(router *gin.Engine, authController *controllers.AuthController) {
+func RegisterAuthRoutes(router *gin.Engine, authController *controllers.AuthController, authMiddleware gin.HandlerFunc) {
 
 	// Authentication routes
 	router.POST("/auth", authController.Authenticate)
 	router.POST("/auth/refresh", authController.Refresh)
-	router.GET("/auth/me", authController.GetLoggedInUser)
+	// router.GET("/auth/me", authMiddleware, authController.GetLoggedInUser)
 }

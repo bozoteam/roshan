@@ -5,9 +5,11 @@ import (
 	"time"
 
 	"github.com/bozoteam/roshan/src/helpers"
-	userDAO "github.com/bozoteam/roshan/src/modules/user/DAO"
+	"github.com/bozoteam/roshan/src/modules/user/models"
+	userDAO "github.com/bozoteam/roshan/src/modules/user/repository"
 	"github.com/gin-gonic/gin"
 	jwt "github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -30,35 +32,87 @@ type JWTConfig struct {
 type AuthController struct {
 	db        *gorm.DB
 	jwtConfig *JWTConfig
+	userRepo  *userDAO.UserRepository
 }
 
 func NewAuthController(db *gorm.DB, jwtConf *JWTConfig) *AuthController {
 	return &AuthController{
 		db:        db,
 		jwtConfig: jwtConf,
+		userRepo:  userDAO.NewUserRepository(db),
 	}
 }
 
-func (c *JWTConfig) GetRefreshTokenKeyFunc(token *jwt.Token) (interface{}, error) {
+func (c *JWTConfig) GetRefreshTokenKeyFunc(token *jwt.Token) (any, error) {
 	return c.refreshKey, nil
 }
 
-func (c *JWTConfig) GetTokenKeyFunc(token *jwt.Token) (interface{}, error) {
+func (c *JWTConfig) GetTokenKeyFunc(token *jwt.Token) (any, error) {
 	return c.key, nil
 }
 
-func (c *AuthController) GenerateToken(subject string, secretKey []byte, duration time.Duration) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
-		Subject:   subject,
-		ExpiresAt: jwt.NewNumericDate(time.Now().Add(duration)),
-	})
+func (c *AuthController) generateToken(user *models.User, secretKey []byte, duration time.Duration, notBefore time.Time) (string, error) {
+	type CustomClaims struct {
+		Email string `json:"email"`
+		jwt.RegisteredClaims
+	}
+
+	uuid, err := uuid.NewV7()
+	if err != nil {
+		panic(err)
+	}
+
+	claims := CustomClaims{
+		Email: user.Email,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        uuid.String(),
+			Subject:   user.Id,
+			ExpiresAt: jwt.NewNumericDate(notBefore.Add(duration)),
+			IssuedAt:  jwt.NewNumericDate(notBefore),
+			Issuer:    "roshan",
+			NotBefore: jwt.NewNumericDate(notBefore),
+		},
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
 	return token.SignedString(secretKey)
+}
+
+func (c *AuthController) generateAndReturnToken(context *gin.Context, user *models.User) {
+	notBefore := time.Now()
+
+	accessTokenString, err := c.generateToken(user, c.jwtConfig.key, time.Duration(c.jwtConfig.tokenDuration)*time.Second, notBefore)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate access token"})
+		return
+	}
+
+	refreshTokenString, err := c.generateToken(user, c.jwtConfig.refreshKey, time.Duration(c.jwtConfig.refreshTokenDuration)*time.Second, notBefore)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate refresh token"})
+		return
+	}
+
+	user.RefreshToken = refreshTokenString
+	if err := c.userRepo.SaveUser(user); err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not save refresh token"})
+		return
+	}
+
+	context.JSON(http.StatusOK, gin.H{
+		"access_token":       accessTokenString,
+		"expires_in":         c.jwtConfig.tokenDuration,
+		"refresh_token":      refreshTokenString,
+		"refresh_expires_in": c.jwtConfig.refreshTokenDuration,
+		"token_type":         "Bearer",
+		"scope":              "email",
+	})
 }
 
 // Authenticate authenticates a user and returns an access token and a refresh token
 func (c *AuthController) Authenticate(context *gin.Context) {
 	var json struct {
-		Username string `json:"username" binding:"required"`
+		Email    string `json:"email" binding:"required"`
 		Password string `json:"password" binding:"required"`
 	}
 	if err := context.BindJSON(&json); err != nil {
@@ -66,34 +120,13 @@ func (c *AuthController) Authenticate(context *gin.Context) {
 		return
 	}
 
-	user, err := userDAO.FindUserByUsername(json.Username)
+	user, err := c.userRepo.FindUserByEmail(json.Email)
 	if err != nil || !helpers.CheckPasswordHash(json.Password, user.Password) {
 		context.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication failed"})
 		return
 	}
 
-	accessTokenString, err := c.GenerateToken(user.Username, c.jwtConfig.key, time.Duration(c.jwtConfig.tokenDuration)*time.Minute)
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate access token"})
-		return
-	}
-
-	refreshTokenString, err := c.GenerateToken(user.Username, c.jwtConfig.refreshKey, time.Duration(c.jwtConfig.refreshTokenDuration)*time.Hour)
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate refresh token"})
-		return
-	}
-
-	user.RefreshToken = refreshTokenString
-	if err := userDAO.SaveUser(user); err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not save refresh token"})
-		return
-	}
-
-	context.SetCookie("refresh_token", refreshTokenString, int(c.jwtConfig.tokenDuration*3600), "/", "", false, true)
-	context.JSON(http.StatusOK, gin.H{
-		"access_token": accessTokenString,
-	})
+	c.generateAndReturnToken(context, user)
 }
 
 // Refresh generates a new access token using a refresh token
@@ -119,18 +152,13 @@ func (c *AuthController) Refresh(context *gin.Context) {
 		return
 	}
 
-	user, err := userDAO.FindUserByUsernameAndToken(subject, json.RefreshToken)
+	user, err := c.userRepo.FindUserByIdAndToken(subject, json.RefreshToken)
 	if err != nil {
 		context.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
 		return
 	}
 
-	accessTokenString, err := c.GenerateToken(user.Username, c.jwtConfig.key, time.Duration(c.jwtConfig.tokenDuration)*time.Minute)
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate access token"})
-		return
-	}
-	context.JSON(http.StatusOK, gin.H{"access_token": accessTokenString})
+	c.generateAndReturnToken(context, user)
 }
 
 // GetLoggedInUser returns the user data of the logged in user
@@ -154,15 +182,11 @@ func (c *AuthController) GetLoggedInUser(context *gin.Context) {
 		return
 	}
 
-	user, err := userDAO.FindUserByUsername(subject)
+	user, err := c.userRepo.FindUserByEmail(subject)
 	if err != nil {
 		context.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
 
-	context.JSON(http.StatusOK, gin.H{
-		"id":       user.ID,
-		"name":     user.Name,
-		"username": user.Username,
-	})
+	context.JSON(http.StatusOK, user)
 }

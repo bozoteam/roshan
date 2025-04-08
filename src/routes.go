@@ -2,6 +2,7 @@ package routes
 
 import (
 	"fmt"
+	"net/http"
 	"strings"
 
 	adapter "github.com/bozoteam/roshan/src/database"
@@ -32,11 +33,19 @@ func RegisterRoutes() *gin.Engine {
 	db := adapter.GetDBConnection()
 	jwtConf := authControllers.NewJWTConfig()
 	authController := authControllers.NewAuthController(db, jwtConf)
-	authMiddleware := middlewares.NewAuthMiddleware(jwtConf)
+	authMiddleware := middlewares.NewAuthMiddleware(jwtConf, db)
 	chatController := chatControllers.NewChatController()
 
-	userRouter.RegisterUserRoutes(router, jwtConf, db)
-	authRouter.RegisterAuthRoutes(router, authController)
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status": http.StatusText(http.StatusOK),
+		})
+	})
+
+	authMiddlewareFunc := authMiddleware.AuthReqUser()
+
+	userRouter.RegisterUserRoutes(router, jwtConf, db, authMiddlewareFunc)
+	authRouter.RegisterAuthRoutes(router, authController, authMiddlewareFunc)
 	chatRouter.RegisterChatRoutes(router, authMiddleware, chatController)
 	return router
 }

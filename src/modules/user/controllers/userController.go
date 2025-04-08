@@ -2,29 +2,28 @@ package controllers
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/bozoteam/roshan/src/helpers"
-	userDAO "github.com/bozoteam/roshan/src/modules/user/DAO"
 	"github.com/bozoteam/roshan/src/modules/user/models"
+	userRepository "github.com/bozoteam/roshan/src/modules/user/repository"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 type UserController struct {
-	db *gorm.DB
+	userRepo *userRepository.UserRepository
 }
 
 func NewUserController(db *gorm.DB) *UserController {
-	return &UserController{db: db}
-
+	return &UserController{userRepo: userRepository.NewUserRepository(db)}
 }
 
 // CreateUser creates a new user
 func (c *UserController) CreateUser(context *gin.Context) {
 	var json struct {
 		Name     string `json:"name" binding:"required"`
-		Username string `json:"username" binding:"required"`
+		Email    string `json:"email" binding:"required"`
 		Password string `json:"password" binding:"required"`
 	}
 	if err := context.BindJSON(&json); err != nil {
@@ -38,15 +37,27 @@ func (c *UserController) CreateUser(context *gin.Context) {
 		return
 	}
 
+	id, err := uuid.NewV7()
+	if err != nil {
+		panic(err)
+	}
 	user := models.User{
-		Name:      json.Name,
-		Username:  json.Username,
-		Password:  hashedPassword,
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		Id:       id.String(),
+		Name:     json.Name,
+		Email:    json.Email,
+		Password: hashedPassword,
 	}
 
-	if err := userDAO.CreateUser(&user); err != nil {
+	if err := models.ValidateUser(&user); err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user data"})
+		return
+	}
+
+	if err := c.userRepo.SaveUser(&user); err != nil {
+		if helpers.IsErrorCode(err, "23505") {
+			context.JSON(http.StatusBadRequest, gin.H{"error": "User already exists"})
+			return
+		}
 		context.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
@@ -56,26 +67,24 @@ func (c *UserController) CreateUser(context *gin.Context) {
 
 // FindUser finds a user by username
 func (c *UserController) FindUser(context *gin.Context) {
-	username := context.Param("username")
+	user := context.MustGet("user").(*models.User)
 
-	user, err := userDAO.FindUserByUsername(username)
+	user, err := c.userRepo.FindUserByEmail(user.Email)
 	if err != nil {
 		context.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
 
-	context.JSON(http.StatusOK, gin.H{
-		"id":       user.ID,
-		"name":     user.Name,
-		"username": user.Username,
-	})
+	context.JSON(http.StatusOK, user)
 }
 
 // UpdateUser updates user data
 func (c *UserController) UpdateUser(context *gin.Context) {
+	user := context.MustGet("user").(*models.User)
+
 	var json struct {
 		Name     *string `json:"name"`
-		Username *string `json:"username"`
+		Email    *string `json:"email"`
 		Password *string `json:"password"`
 	}
 	if err := context.BindJSON(&json); err != nil {
@@ -83,22 +92,32 @@ func (c *UserController) UpdateUser(context *gin.Context) {
 		return
 	}
 
-	username := context.Param("username")
-	updates := make(map[string]interface{})
 	if json.Name != nil {
-		updates["name"] = *json.Name
+		user.Name = *json.Name
 	}
-	if json.Username != nil {
-		updates["username"] = *json.Username
+	if json.Email != nil {
+		user.Email = *json.Email
 	}
 	if json.Password != nil {
-		updates["password"] = *json.Password
+		pass, err := helpers.HashPassword(*json.Password)
+		if err != nil {
+			context.JSON(http.StatusInternalServerError, gin.H{"error": "Error hashing password"})
+			return
+		}
+		user.Password = pass
 	}
 
-	updates["updated_at"] = time.Now()
+	if err := models.ValidateUser(user); err != nil {
+		context.JSON(http.StatusBadRequest, gin.H{"error": "Invalid user data"})
+		return
+	}
 
-	if err := userDAO.UpdateUser(username, updates); err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not update user"})
+	if err := c.userRepo.SaveUser(user); err != nil {
+		if helpers.IsErrorCode(err, "23505") {
+			context.JSON(http.StatusBadRequest, gin.H{"error": "User already exists"})
+			return
+		}
+		context.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -107,12 +126,18 @@ func (c *UserController) UpdateUser(context *gin.Context) {
 
 // DeleteUser deletes a user by username
 func (c *UserController) DeleteUser(context *gin.Context) {
-	username := context.Param("username")
+	user := context.MustGet("user").(*models.User)
 
-	if err := userDAO.DeleteUserByUsername(username); err != nil {
+	if err := c.userRepo.DeleteUser(user); err != nil {
 		context.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
 		return
 	}
 
 	context.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
+}
+
+func (c *UserController) GetUser(context *gin.Context) {
+	user := context.MustGet("user").(*models.User)
+
+	context.JSON(http.StatusOK, user)
 }
