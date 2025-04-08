@@ -8,8 +8,12 @@ import (
 	"github.com/joho/godotenv"
 )
 
-func init() {
-	if err := godotenv.Load(); err != nil {
+func LoadDotEnv() {
+	file := ".env"
+	if _, err := os.Stat(file); err != nil {
+		file = ".env.dev"
+	}
+	if err := godotenv.Load(file); err != nil {
 		log.Println("Warning: .env file not found")
 	}
 }
