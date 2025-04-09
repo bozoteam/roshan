@@ -4,8 +4,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	log "github.com/bozoteam/roshan/internal/adapter/log"
 	"github.com/bozoteam/roshan/internal/helpers"
-	log "github.com/bozoteam/roshan/internal/log"
 	"github.com/bozoteam/roshan/internal/modules/user/models"
 	userRepository "github.com/bozoteam/roshan/internal/modules/user/repository"
 	"github.com/gin-gonic/gin"
@@ -19,7 +19,7 @@ type UserUsecase struct {
 }
 
 func NewUserUsecase(db *gorm.DB) *UserUsecase {
-	return &UserUsecase{userRepo: userRepository.NewUserRepository(db), logger: log.WithModule("user_usecase")}
+	return &UserUsecase{userRepo: userRepository.NewUserRepository(db), logger: log.LogWithModule("user_usecase")}
 }
 
 // CreateUser creates a new user

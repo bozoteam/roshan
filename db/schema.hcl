@@ -33,7 +33,7 @@ table "user" {
   }
 
   unique "unique_email" {
-   columns = [column.email]
+    columns = [column.email]
   }
   primary_key {
     columns = [column.id]

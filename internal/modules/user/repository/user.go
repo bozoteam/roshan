@@ -3,13 +3,13 @@ package repository
 import (
 	"log/slog"
 
-	log "github.com/bozoteam/roshan/internal/log"
+	log "github.com/bozoteam/roshan/internal/adapter/log"
 	"github.com/bozoteam/roshan/internal/modules/user/models"
 	"gorm.io/gorm"
 )
 
 func NewUserRepository(db *gorm.DB) *UserRepository {
-	return &UserRepository{db: db, logger: log.WithModule("user_repository")}
+	return &UserRepository{db: db, logger: log.LogWithModule("user_repository")}
 }
 
 type UserRepository struct {

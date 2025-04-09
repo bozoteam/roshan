@@ -14,6 +14,6 @@ func init() {
 	}))
 }
 
-func WithModule(module string) *slog.Logger {
+func LogWithModule(module string) *slog.Logger {
 	return globalLogger.With("module", module)
 }

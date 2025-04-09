@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	log "github.com/bozoteam/roshan/internal/log"
+	"github.com/bozoteam/roshan/internal/adapter/log"
 	authUsecase "github.com/bozoteam/roshan/internal/modules/auth/usecase"
 	userRepository "github.com/bozoteam/roshan/internal/modules/user/repository"
 	"github.com/gin-gonic/gin"
@@ -19,7 +19,7 @@ type AuthMiddleware struct {
 }
 
 func NewAuthMiddleware(jwtConf *authUsecase.JWTConfig, userRepository *userRepository.UserRepository) *AuthMiddleware {
-	return &AuthMiddleware{jwtConfig: jwtConf, userRepository: userRepository, logger: log.WithModule("auth_middleware")}
+	return &AuthMiddleware{jwtConfig: jwtConf, userRepository: userRepository, logger: log.LogWithModule("auth_middleware")}
 }
 
 func (m *AuthMiddleware) AuthReqUser() gin.HandlerFunc {

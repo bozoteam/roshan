@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	log "github.com/bozoteam/roshan/internal/adapter/log"
 	"github.com/bozoteam/roshan/internal/helpers"
-	log "github.com/bozoteam/roshan/internal/log"
 	"github.com/bozoteam/roshan/internal/modules/user/models"
 	userRepository "github.com/bozoteam/roshan/internal/modules/user/repository"
 	"github.com/gin-gonic/gin"
@@ -39,7 +39,7 @@ type AuthUsecase struct {
 
 func NewAuthUsecase(userRepository *userRepository.UserRepository, jwtConf *JWTConfig) *AuthUsecase {
 	return &AuthUsecase{
-		logger:    log.WithModule("auth_usecase"),
+		logger:    log.LogWithModule("auth_usecase"),
 		jwtConfig: jwtConf,
 		userRepo:  userRepository,
 	}
