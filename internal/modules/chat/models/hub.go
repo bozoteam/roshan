@@ -3,25 +3,27 @@ package models
 import (
 	"sync"
 
+	"github.com/bozoteam/roshan/internal/modules/user/models"
 	"github.com/gorilla/websocket"
 )
 
 type Message struct {
-	RoomID  string `json:"roomId"`
+	RoomID  string `json:"room_id"`
+	UserId  string `json:"user_id"`
 	Content string `json:"content"`
 }
 
-type User struct {
-	ID       string
-	Username string
-	Conn     *websocket.Conn
+type RoomClient struct {
+	*models.User
+	Conn *websocket.Conn
 }
 
 type Room struct {
-	ID    string
-	Name  string
-	Users map[*websocket.Conn]User
-	Mutex sync.Mutex
+	ID        string
+	Name      string
+	CreatorId string
+	Clients   map[*RoomClient]bool
+	Mutex     *sync.Mutex
 }
 
 type Hub struct {
@@ -56,11 +58,11 @@ func (h *Hub) Run() {
 			h.Mutex.Lock()
 			if room, ok := h.Rooms[message.RoomID]; ok {
 				room.Mutex.Lock()
-				for conn, user := range room.Users {
-					err := user.Conn.WriteMessage(websocket.TextMessage, []byte(message.Content))
+				for client, _ := range room.Clients {
+					err := client.Conn.WriteMessage(websocket.TextMessage, []byte(message.Content))
 					if err != nil {
-						user.Conn.Close()
-						delete(room.Users, conn)
+						client.Conn.Close()
+						delete(room.Clients, client)
 					}
 				}
 				room.Mutex.Unlock()

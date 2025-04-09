@@ -28,17 +28,17 @@ func NewAuthUsecase(userRepository *userRepository.UserRepository, jwtRepository
 
 // Authenticate authenticates a user and returns an access token and a refresh token
 func (c *AuthUsecase) Authenticate(context *gin.Context) {
-	var json struct {
+	var input struct {
 		Email    string `json:"email" binding:"required"`
 		Password string `json:"password" binding:"required"`
 	}
-	if err := context.BindJSON(&json); err != nil {
+	if err := context.BindJSON(&input); err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		return
 	}
 
-	user, err := c.userRepo.FindUserByEmail(json.Email)
-	if err != nil || !helpers.CheckPasswordHash(json.Password, user.Password) {
+	user, err := c.userRepo.FindUserByEmail(input.Email)
+	if err != nil || !helpers.CheckPasswordHash(input.Password, user.Password) {
 		context.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication failed"})
 		return
 	}
@@ -54,15 +54,15 @@ func (c *AuthUsecase) Authenticate(context *gin.Context) {
 
 // Refresh generates a new access token using a refresh token
 func (c *AuthUsecase) Refresh(context *gin.Context) {
-	var json struct {
+	var input struct {
 		RefreshToken string `json:"refresh_token" binding:"required"`
 	}
-	if err := context.BindJSON(&json); err != nil {
+	if err := context.BindJSON(&input); err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		return
 	}
 
-	_, claims, err := c.jwtRepository.ValidateToken(json.RefreshToken, jwtRepository.REFRESH_TOKEN)
+	_, claims, err := c.jwtRepository.ValidateToken(input.RefreshToken, jwtRepository.REFRESH_TOKEN)
 	if err != nil {
 		context.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
 		return
@@ -74,7 +74,7 @@ func (c *AuthUsecase) Refresh(context *gin.Context) {
 		return
 	}
 
-	user, err := c.userRepo.FindUserByIdAndToken(subject, json.RefreshToken)
+	user, err := c.userRepo.FindUserByIdAndToken(subject, input.RefreshToken)
 	if err != nil {
 		context.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
 		return

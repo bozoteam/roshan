@@ -24,17 +24,17 @@ func NewUserUsecase(db *gorm.DB) *UserUsecase {
 
 // CreateUser creates a new user
 func (c *UserUsecase) CreateUser(context *gin.Context) {
-	var json struct {
+	var input struct {
 		Name     string `json:"name" binding:"required"`
 		Email    string `json:"email" binding:"required"`
 		Password string `json:"password" binding:"required"`
 	}
-	if err := context.BindJSON(&json); err != nil {
+	if err := context.BindJSON(&input); err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		return
 	}
 
-	hashedPassword, err := helpers.HashPassword(json.Password)
+	hashedPassword, err := helpers.HashPassword(input.Password)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{"error": "Error hashing password"})
 		return
@@ -46,8 +46,8 @@ func (c *UserUsecase) CreateUser(context *gin.Context) {
 	}
 	user := &models.User{
 		Id:       id.String(),
-		Name:     json.Name,
-		Email:    json.Email,
+		Name:     input.Name,
+		Email:    input.Email,
 		Password: hashedPassword,
 	}
 
@@ -85,24 +85,24 @@ func (c *UserUsecase) FindUser(context *gin.Context) {
 func (c *UserUsecase) UpdateUser(context *gin.Context) {
 	user := context.MustGet("user").(*models.User)
 
-	var json struct {
+	var input struct {
 		Name     *string `json:"name"`
 		Email    *string `json:"email"`
 		Password *string `json:"password"`
 	}
-	if err := context.BindJSON(&json); err != nil {
+	if err := context.BindJSON(&input); err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		return
 	}
 
-	if json.Name != nil {
-		user.Name = *json.Name
+	if input.Name != nil {
+		user.Name = *input.Name
 	}
-	if json.Email != nil {
-		user.Email = *json.Email
+	if input.Email != nil {
+		user.Email = *input.Email
 	}
-	if json.Password != nil {
-		pass, err := helpers.HashPassword(*json.Password)
+	if input.Password != nil {
+		pass, err := helpers.HashPassword(*input.Password)
 		if err != nil {
 			context.JSON(http.StatusInternalServerError, gin.H{"error": "Error hashing password"})
 			return

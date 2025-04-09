@@ -12,10 +12,13 @@ func RegisterChatRoutes(router *gin.Engine, authMiddleware *middlewares.AuthMidd
 	authReqUser := authMiddleware.AuthReqUser()
 
 	// Public routes for chat
+	router.GET("/chat/rooms", chatUsecase.ListRooms)
+
+	// private
 	router.POST("/chat/rooms", authReqUser, chatUsecase.CreateRoom)
-	router.GET("/chat/rooms", authReqUser, chatUsecase.ListRooms)
-	router.GET("/chat/rooms/:id/users", authReqUser, chatUsecase.ListUsers)
+
+	// router.GET("/chat/rooms/:id/users", authReqUser, chatUsecase.ListUsers)
 	router.DELETE("/chat/rooms/:id", authReqUser, chatUsecase.DeleteRoom)
 
-	router.GET("/chat/rooms/:id/ws", chatUsecase.HandleWebSocket)
+	router.GET("/chat/rooms/:id/ws", authReqUser, chatUsecase.HandleWebSocket)
 }
