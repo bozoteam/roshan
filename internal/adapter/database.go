@@ -2,18 +2,12 @@ package adapter
 
 import (
 	"fmt"
-	"sync"
 
 	// gorm_postgres "gorm.io/driver/postgres"
-	"github.com/bozoteam/roshan/src/helpers"
+	"github.com/bozoteam/roshan/internal/helpers"
 	gorm_postgres "gorm.io/driver/postgres"
 
 	"gorm.io/gorm"
-)
-
-var (
-	dbInstance *gorm.DB
-	dbOnce     sync.Once
 )
 
 // GetDBConnection returns a singleton instance of a database connection
@@ -31,7 +25,7 @@ func GetDBConnection() *gorm.DB {
 		host, user, password, dbName, port,
 	)
 
-	dbInstance, err = gorm.Open(gorm_postgres.Open(dsn), &gorm.Config{})
+	dbInstance, err := gorm.Open(gorm_postgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		err = fmt.Errorf("error opening database connection: %v", err)
 		panic(err)

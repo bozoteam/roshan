@@ -3,8 +3,8 @@ package repository
 import (
 	"log/slog"
 
-	log "github.com/bozoteam/roshan/src/log"
-	"github.com/bozoteam/roshan/src/modules/user/models"
+	log "github.com/bozoteam/roshan/internal/log"
+	"github.com/bozoteam/roshan/internal/modules/user/models"
 	"gorm.io/gorm"
 )
 
@@ -20,6 +20,15 @@ type UserRepository struct {
 func (c *UserRepository) FindUserByEmail(email string) (*models.User, error) {
 	var user models.User
 	if err := c.db.Where("email = ?", email).First(&user).Error; err != nil {
+		return nil, err
+	}
+	return &user, nil
+}
+
+func (c *UserRepository) FindUserById(id string) (*models.User, error) {
+	var user models.User
+	err := c.db.First(&user, "id = ?", id).Error
+	if err != nil {
 		return nil, err
 	}
 	return &user, nil

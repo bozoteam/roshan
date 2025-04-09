@@ -1,18 +1,17 @@
-package controllers
+package usecase
 
 import (
 	"log/slog"
 	"net/http"
 	"time"
 
-	"github.com/bozoteam/roshan/src/helpers"
-	log "github.com/bozoteam/roshan/src/log"
-	"github.com/bozoteam/roshan/src/modules/user/models"
-	userRepository "github.com/bozoteam/roshan/src/modules/user/repository"
+	"github.com/bozoteam/roshan/internal/helpers"
+	log "github.com/bozoteam/roshan/internal/log"
+	"github.com/bozoteam/roshan/internal/modules/user/models"
+	userRepository "github.com/bozoteam/roshan/internal/modules/user/repository"
 	"github.com/gin-gonic/gin"
 	jwt "github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 func NewJWTConfig() *JWTConfig {
@@ -31,20 +30,18 @@ type JWTConfig struct {
 	refreshTokenDuration int64
 }
 
-type AuthController struct {
+type AuthUsecase struct {
 	logger *slog.Logger
 
-	db        *gorm.DB
 	jwtConfig *JWTConfig
 	userRepo  *userRepository.UserRepository
 }
 
-func NewAuthController(db *gorm.DB, jwtConf *JWTConfig) *AuthController {
-	return &AuthController{
-		logger:    log.WithModule("auth_controller"),
-		db:        db,
+func NewAuthUsecase(userRepository *userRepository.UserRepository, jwtConf *JWTConfig) *AuthUsecase {
+	return &AuthUsecase{
+		logger:    log.WithModule("auth_usecase"),
 		jwtConfig: jwtConf,
-		userRepo:  userRepository.NewUserRepository(db),
+		userRepo:  userRepository,
 	}
 }
 
@@ -56,7 +53,7 @@ func (c *JWTConfig) GetTokenKeyFunc(token *jwt.Token) (any, error) {
 	return c.key, nil
 }
 
-func (c *AuthController) generateToken(user *models.User, secretKey []byte, duration time.Duration, notBefore time.Time) (string, error) {
+func (c *AuthUsecase) generateToken(user *models.User, secretKey []byte, duration time.Duration, notBefore time.Time) (string, error) {
 	type CustomClaims struct {
 		Email string `json:"email"`
 		jwt.RegisteredClaims
@@ -83,7 +80,7 @@ func (c *AuthController) generateToken(user *models.User, secretKey []byte, dura
 	return token.SignedString(secretKey)
 }
 
-func (c *AuthController) generateAndReturnToken(context *gin.Context, user *models.User) {
+func (c *AuthUsecase) generateAndReturnToken(context *gin.Context, user *models.User) {
 	notBefore := time.Now()
 
 	accessTokenString, err := c.generateToken(user, c.jwtConfig.key, time.Duration(c.jwtConfig.tokenDuration)*time.Second, notBefore)
@@ -115,7 +112,7 @@ func (c *AuthController) generateAndReturnToken(context *gin.Context, user *mode
 }
 
 // Authenticate authenticates a user and returns an access token and a refresh token
-func (c *AuthController) Authenticate(context *gin.Context) {
+func (c *AuthUsecase) Authenticate(context *gin.Context) {
 	var json struct {
 		Email    string `json:"email" binding:"required"`
 		Password string `json:"password" binding:"required"`
@@ -135,7 +132,7 @@ func (c *AuthController) Authenticate(context *gin.Context) {
 }
 
 // Refresh generates a new access token using a refresh token
-func (c *AuthController) Refresh(context *gin.Context) {
+func (c *AuthUsecase) Refresh(context *gin.Context) {
 	var json struct {
 		RefreshToken string `json:"refresh_token" binding:"required"`
 	}
@@ -167,7 +164,7 @@ func (c *AuthController) Refresh(context *gin.Context) {
 }
 
 // GetLoggedInUser returns the user data of the logged in user
-func (c *AuthController) GetLoggedInUser(context *gin.Context) {
+func (c *AuthUsecase) GetLoggedInUser(context *gin.Context) {
 	tokenString := context.GetHeader("Authorization")
 	if tokenString == "" {
 		context.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing"})

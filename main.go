@@ -1,12 +1,12 @@
 package main
 
 import (
-	routes "github.com/bozoteam/roshan/src"
-	"github.com/bozoteam/roshan/src/helpers"
+	"github.com/bozoteam/roshan/internal/adapter"
+	"github.com/bozoteam/roshan/internal/helpers"
 )
 
 func main() {
 	helpers.LoadDotEnv()
 
-	routes.RunServer()
+	adapter.RunServer()
 }

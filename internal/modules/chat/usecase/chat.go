@@ -1,22 +1,22 @@
-package controllers
+package usecase
 
 import (
 	"net/http"
 
-	"github.com/bozoteam/roshan/src/modules/chat/models"
+	"github.com/bozoteam/roshan/internal/modules/chat/models"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
-type ChatController struct {
+type ChatUsecase struct {
 	hub      *models.Hub
 	upgrader *websocket.Upgrader
 }
 
-func NewChatController() *ChatController {
+func NewChatUsecase() *ChatUsecase {
 	hub := models.NewHub()
 	go hub.Run()
-	return &ChatController{hub: hub, upgrader: new(websocket.Upgrader)}
+	return &ChatUsecase{hub: hub, upgrader: new(websocket.Upgrader)}
 }
 
 type RoomResponse struct {
@@ -29,7 +29,7 @@ type UserInfo struct {
 	Username string `json:"username"`
 }
 
-func (cc *ChatController) CreateRoom(c *gin.Context) {
+func (cc *ChatUsecase) CreateRoom(c *gin.Context) {
 	var room models.Room
 	if err := c.ShouldBindJSON(&room); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -44,7 +44,7 @@ func (cc *ChatController) CreateRoom(c *gin.Context) {
 	c.JSON(http.StatusOK, roomResponse)
 }
 
-func (cc *ChatController) ListRooms(c *gin.Context) {
+func (cc *ChatUsecase) ListRooms(c *gin.Context) {
 	cc.hub.Mutex.Lock()
 	defer cc.hub.Mutex.Unlock()
 	rooms := make([]RoomResponse, 0, len(cc.hub.Rooms))
@@ -64,7 +64,7 @@ func (cc *ChatController) ListRooms(c *gin.Context) {
 	c.JSON(http.StatusOK, rooms)
 }
 
-func (cc *ChatController) ListUsers(c *gin.Context) {
+func (cc *ChatUsecase) ListUsers(c *gin.Context) {
 	roomID := c.Param("id")
 	cc.hub.Mutex.Lock()
 	room, exists := cc.hub.Rooms[roomID]
@@ -82,7 +82,7 @@ func (cc *ChatController) ListUsers(c *gin.Context) {
 	c.JSON(http.StatusOK, users)
 }
 
-func (cc *ChatController) DeleteRoom(c *gin.Context) {
+func (cc *ChatUsecase) DeleteRoom(c *gin.Context) {
 	roomID := c.Param("id")
 	cc.hub.Mutex.Lock()
 	room, exists := cc.hub.Rooms[roomID]
@@ -95,7 +95,7 @@ func (cc *ChatController) DeleteRoom(c *gin.Context) {
 	}
 }
 
-func (cc *ChatController) HandleWebSocket(c *gin.Context) {
+func (cc *ChatUsecase) HandleWebSocket(c *gin.Context) {
 	conn, err := cc.upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return

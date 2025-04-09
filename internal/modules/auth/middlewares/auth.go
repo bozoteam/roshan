@@ -5,22 +5,21 @@ import (
 	"net/http"
 	"strings"
 
-	log "github.com/bozoteam/roshan/src/log"
-	"github.com/bozoteam/roshan/src/modules/auth/controllers"
-	models "github.com/bozoteam/roshan/src/modules/user/models"
+	log "github.com/bozoteam/roshan/internal/log"
+	authUsecase "github.com/bozoteam/roshan/internal/modules/auth/usecase"
+	userRepository "github.com/bozoteam/roshan/internal/modules/user/repository"
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
-	"gorm.io/gorm"
 )
 
 type AuthMiddleware struct {
-	logger    *slog.Logger
-	jwtConfig *controllers.JWTConfig
-	db        *gorm.DB
+	logger         *slog.Logger
+	jwtConfig      *authUsecase.JWTConfig
+	userRepository *userRepository.UserRepository
 }
 
-func NewAuthMiddleware(jwtConf *controllers.JWTConfig, db *gorm.DB) *AuthMiddleware {
-	return &AuthMiddleware{jwtConfig: jwtConf, db: db, logger: log.WithModule("auth_middleware")}
+func NewAuthMiddleware(jwtConf *authUsecase.JWTConfig, userRepository *userRepository.UserRepository) *AuthMiddleware {
+	return &AuthMiddleware{jwtConfig: jwtConf, userRepository: userRepository, logger: log.WithModule("auth_middleware")}
 }
 
 func (m *AuthMiddleware) AuthReqUser() gin.HandlerFunc {
@@ -56,8 +55,7 @@ func (m *AuthMiddleware) AuthReqUser() gin.HandlerFunc {
 			return
 		}
 
-		var user models.User
-		err = m.db.First(&user, "id = ?", subject).Error
+		user, err := m.userRepository.FindUserById(subject)
 		if err != nil {
 			context.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			context.Abort()

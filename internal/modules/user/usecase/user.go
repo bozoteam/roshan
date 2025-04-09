@@ -1,29 +1,29 @@
-package controllers
+package usecase
 
 import (
 	"log/slog"
 	"net/http"
 
-	"github.com/bozoteam/roshan/src/helpers"
-	log "github.com/bozoteam/roshan/src/log"
-	"github.com/bozoteam/roshan/src/modules/user/models"
-	userRepository "github.com/bozoteam/roshan/src/modules/user/repository"
+	"github.com/bozoteam/roshan/internal/helpers"
+	log "github.com/bozoteam/roshan/internal/log"
+	"github.com/bozoteam/roshan/internal/modules/user/models"
+	userRepository "github.com/bozoteam/roshan/internal/modules/user/repository"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
-type UserController struct {
+type UserUsecase struct {
 	logger   *slog.Logger
 	userRepo *userRepository.UserRepository
 }
 
-func NewUserController(db *gorm.DB) *UserController {
-	return &UserController{userRepo: userRepository.NewUserRepository(db), logger: log.WithModule("user_controller")}
+func NewUserUsecase(db *gorm.DB) *UserUsecase {
+	return &UserUsecase{userRepo: userRepository.NewUserRepository(db), logger: log.WithModule("user_usecase")}
 }
 
 // CreateUser creates a new user
-func (c *UserController) CreateUser(context *gin.Context) {
+func (c *UserUsecase) CreateUser(context *gin.Context) {
 	var json struct {
 		Name     string `json:"name" binding:"required"`
 		Email    string `json:"email" binding:"required"`
@@ -69,7 +69,7 @@ func (c *UserController) CreateUser(context *gin.Context) {
 }
 
 // FindUser finds a user by username
-func (c *UserController) FindUser(context *gin.Context) {
+func (c *UserUsecase) FindUser(context *gin.Context) {
 	user := context.MustGet("user").(*models.User)
 
 	user, err := c.userRepo.FindUserByEmail(user.Email)
@@ -82,7 +82,7 @@ func (c *UserController) FindUser(context *gin.Context) {
 }
 
 // UpdateUser updates user data
-func (c *UserController) UpdateUser(context *gin.Context) {
+func (c *UserUsecase) UpdateUser(context *gin.Context) {
 	user := context.MustGet("user").(*models.User)
 
 	var json struct {
@@ -128,7 +128,7 @@ func (c *UserController) UpdateUser(context *gin.Context) {
 }
 
 // DeleteUser deletes a user by username
-func (c *UserController) DeleteUser(context *gin.Context) {
+func (c *UserUsecase) DeleteUser(context *gin.Context) {
 	user := context.MustGet("user").(*models.User)
 
 	if err := c.userRepo.DeleteUser(user); err != nil {
@@ -139,7 +139,7 @@ func (c *UserController) DeleteUser(context *gin.Context) {
 	context.JSON(http.StatusOK, gin.H{"message": "User deleted successfully"})
 }
 
-func (c *UserController) GetUser(context *gin.Context) {
+func (c *UserUsecase) GetUser(context *gin.Context) {
 	user := context.MustGet("user").(*models.User)
 
 	context.JSON(http.StatusOK, user)
