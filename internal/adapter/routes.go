@@ -7,6 +7,7 @@ import (
 
 	"github.com/bozoteam/roshan/internal/helpers"
 	"github.com/bozoteam/roshan/internal/modules/auth/middlewares"
+	jwtRepository "github.com/bozoteam/roshan/internal/modules/auth/repository/jwt"
 	authRouter "github.com/bozoteam/roshan/internal/modules/auth/routes"
 	authUsecase "github.com/bozoteam/roshan/internal/modules/auth/usecase"
 	chatRouter "github.com/bozoteam/roshan/internal/modules/chat/routes"
@@ -34,9 +35,9 @@ func RegisterRoutes() *gin.Engine {
 
 	db := GetDBConnection()
 	userRepository := userRepository.NewUserRepository(db)
-	jwtConf := authUsecase.NewJWTConfig()
-	authUsecase := authUsecase.NewAuthUsecase(userRepository, jwtConf)
-	authMiddleware := middlewares.NewAuthMiddleware(jwtConf, userRepository)
+	jwtRepository := jwtRepository.NewJWTRepository()
+	authUsecase := authUsecase.NewAuthUsecase(userRepository, jwtRepository)
+	authMiddleware := middlewares.NewAuthMiddleware(jwtRepository, userRepository)
 	chatUsecase := chatUsecase.NewChatUsecase()
 
 	router.GET("/health", func(c *gin.Context) {
@@ -47,7 +48,7 @@ func RegisterRoutes() *gin.Engine {
 
 	authMiddlewareFunc := authMiddleware.AuthReqUser()
 
-	userRouter.RegisterUserRoutes(router, jwtConf, db, authMiddlewareFunc)
+	userRouter.RegisterUserRoutes(router, db, authMiddlewareFunc)
 	authRouter.RegisterAuthRoutes(router, authUsecase, authMiddlewareFunc)
 	chatRouter.RegisterChatRoutes(router, authMiddleware, chatUsecase)
 	return router

@@ -11,5 +11,4 @@ func RegisterAuthRoutes(router *gin.Engine, authUsecase *authUsecase.AuthUsecase
 	// Authentication routes
 	router.POST("/auth", authUsecase.Authenticate)
 	router.POST("/auth/refresh", authUsecase.Refresh)
-	// router.GET("/auth/me", authMiddleware, authUsecase.GetLoggedInUser)
 }

@@ -6,20 +6,19 @@ import (
 	"strings"
 
 	"github.com/bozoteam/roshan/internal/adapter/log"
-	authUsecase "github.com/bozoteam/roshan/internal/modules/auth/usecase"
+	jwtRepository "github.com/bozoteam/roshan/internal/modules/auth/repository/jwt"
 	userRepository "github.com/bozoteam/roshan/internal/modules/user/repository"
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 )
 
 type AuthMiddleware struct {
 	logger         *slog.Logger
-	jwtConfig      *authUsecase.JWTConfig
+	jwtRepository  *jwtRepository.JWTRepository
 	userRepository *userRepository.UserRepository
 }
 
-func NewAuthMiddleware(jwtConf *authUsecase.JWTConfig, userRepository *userRepository.UserRepository) *AuthMiddleware {
-	return &AuthMiddleware{jwtConfig: jwtConf, userRepository: userRepository, logger: log.LogWithModule("auth_middleware")}
+func NewAuthMiddleware(jwtRepository *jwtRepository.JWTRepository, userRepository *userRepository.UserRepository) *AuthMiddleware {
+	return &AuthMiddleware{jwtRepository: jwtRepository, userRepository: userRepository, logger: log.LogWithModule("auth_middleware")}
 }
 
 func (m *AuthMiddleware) AuthReqUser() gin.HandlerFunc {
@@ -41,14 +40,14 @@ func (m *AuthMiddleware) AuthReqUser() gin.HandlerFunc {
 			return
 		}
 
-		token, err := jwt.Parse(tokenString, m.jwtConfig.GetTokenKeyFunc)
-		if err != nil || !token.Valid {
+		_, claims, err := m.jwtRepository.ValidateToken(tokenString, jwtRepository.ACCESS_TOKEN)
+		if err != nil {
 			context.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			context.Abort()
 			return
 		}
 
-		subject, err := token.Claims.GetSubject()
+		subject, err := claims.GetSubject()
 		if err != nil {
 			context.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			context.Abort()
@@ -62,7 +61,7 @@ func (m *AuthMiddleware) AuthReqUser() gin.HandlerFunc {
 			return
 		}
 
-		context.Set("user", &user)
+		context.Set("user", user)
 		context.Next()
 	}
 }

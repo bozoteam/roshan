@@ -3,112 +3,27 @@ package usecase
 import (
 	"log/slog"
 	"net/http"
-	"time"
 
 	log "github.com/bozoteam/roshan/internal/adapter/log"
 	"github.com/bozoteam/roshan/internal/helpers"
-	"github.com/bozoteam/roshan/internal/modules/user/models"
+	jwtRepository "github.com/bozoteam/roshan/internal/modules/auth/repository/jwt"
 	userRepository "github.com/bozoteam/roshan/internal/modules/user/repository"
 	"github.com/gin-gonic/gin"
-	jwt "github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 )
-
-func NewJWTConfig() *JWTConfig {
-	return &JWTConfig{
-		key:                  []byte(helpers.GetEnv("JWT_SECRET")),
-		refreshKey:           []byte(helpers.GetEnv("JWT_REFRESH_SECRET")),
-		tokenDuration:        helpers.GetEnvAsInt("JWT_TOKEN_EXPIRATION"),
-		refreshTokenDuration: helpers.GetEnvAsInt("JWT_REFRESH_TOKEN_EXPIRATION"),
-	}
-}
-
-type JWTConfig struct {
-	key                  []byte
-	refreshKey           []byte
-	tokenDuration        int64
-	refreshTokenDuration int64
-}
 
 type AuthUsecase struct {
 	logger *slog.Logger
 
-	jwtConfig *JWTConfig
-	userRepo  *userRepository.UserRepository
+	jwtRepository *jwtRepository.JWTRepository
+	userRepo      *userRepository.UserRepository
 }
 
-func NewAuthUsecase(userRepository *userRepository.UserRepository, jwtConf *JWTConfig) *AuthUsecase {
+func NewAuthUsecase(userRepository *userRepository.UserRepository, jwtRepository *jwtRepository.JWTRepository) *AuthUsecase {
 	return &AuthUsecase{
-		logger:    log.LogWithModule("auth_usecase"),
-		jwtConfig: jwtConf,
-		userRepo:  userRepository,
+		logger:        log.LogWithModule("auth_usecase"),
+		jwtRepository: jwtRepository,
+		userRepo:      userRepository,
 	}
-}
-
-func (c *JWTConfig) GetRefreshTokenKeyFunc(token *jwt.Token) (any, error) {
-	return c.refreshKey, nil
-}
-
-func (c *JWTConfig) GetTokenKeyFunc(token *jwt.Token) (any, error) {
-	return c.key, nil
-}
-
-func (c *AuthUsecase) generateToken(user *models.User, secretKey []byte, duration time.Duration, notBefore time.Time) (string, error) {
-	type CustomClaims struct {
-		Email string `json:"email"`
-		jwt.RegisteredClaims
-	}
-
-	uuid, err := uuid.NewV7()
-	if err != nil {
-		panic(err)
-	}
-
-	claims := CustomClaims{
-		Email: user.Email,
-		RegisteredClaims: jwt.RegisteredClaims{
-			ID:        uuid.String(),
-			Subject:   user.Id,
-			ExpiresAt: jwt.NewNumericDate(notBefore.Add(duration)),
-			IssuedAt:  jwt.NewNumericDate(notBefore),
-			Issuer:    "roshan",
-			NotBefore: jwt.NewNumericDate(notBefore),
-		},
-	}
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-
-	return token.SignedString(secretKey)
-}
-
-func (c *AuthUsecase) generateAndReturnToken(context *gin.Context, user *models.User) {
-	notBefore := time.Now()
-
-	accessTokenString, err := c.generateToken(user, c.jwtConfig.key, time.Duration(c.jwtConfig.tokenDuration)*time.Second, notBefore)
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate access token"})
-		return
-	}
-
-	refreshTokenString, err := c.generateToken(user, c.jwtConfig.refreshKey, time.Duration(c.jwtConfig.refreshTokenDuration)*time.Second, notBefore)
-	if err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate refresh token"})
-		return
-	}
-
-	user.RefreshToken = refreshTokenString
-	if err := c.userRepo.SaveUser(user); err != nil {
-		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not save refresh token"})
-		return
-	}
-
-	context.JSON(http.StatusOK, gin.H{
-		"access_token":       accessTokenString,
-		"expires_in":         c.jwtConfig.tokenDuration,
-		"refresh_token":      refreshTokenString,
-		"refresh_expires_in": c.jwtConfig.refreshTokenDuration,
-		"token_type":         "Bearer",
-		"scope":              "email",
-	})
 }
 
 // Authenticate authenticates a user and returns an access token and a refresh token
@@ -128,7 +43,13 @@ func (c *AuthUsecase) Authenticate(context *gin.Context) {
 		return
 	}
 
-	c.generateAndReturnToken(context, user)
+	tokenData, err := c.jwtRepository.GenerateAccessAndRefreshTokens(user)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate tokens"})
+		return
+	}
+
+	context.JSON(http.StatusOK, tokenData)
 }
 
 // Refresh generates a new access token using a refresh token
@@ -141,9 +62,8 @@ func (c *AuthUsecase) Refresh(context *gin.Context) {
 		return
 	}
 
-	var claims jwt.RegisteredClaims
-	token, err := jwt.ParseWithClaims(json.RefreshToken, &claims, c.jwtConfig.GetRefreshTokenKeyFunc)
-	if err != nil || !token.Valid {
+	_, claims, err := c.jwtRepository.ValidateToken(json.RefreshToken, jwtRepository.REFRESH_TOKEN)
+	if err != nil {
 		context.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid refresh token"})
 		return
 	}
@@ -160,35 +80,11 @@ func (c *AuthUsecase) Refresh(context *gin.Context) {
 		return
 	}
 
-	c.generateAndReturnToken(context, user)
-}
-
-// GetLoggedInUser returns the user data of the logged in user
-func (c *AuthUsecase) GetLoggedInUser(context *gin.Context) {
-	tokenString := context.GetHeader("Authorization")
-	if tokenString == "" {
-		context.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header missing"})
-		return
-	}
-
-	var claims jwt.RegisteredClaims
-	token, err := jwt.ParseWithClaims(tokenString, &claims, c.jwtConfig.GetTokenKeyFunc)
-	if err != nil || !token.Valid {
-		context.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-		return
-	}
-
-	subject, err := token.Claims.GetSubject()
+	tokenData, err := c.jwtRepository.GenerateAccessAndRefreshTokens(user)
 	if err != nil {
-		context.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate tokens"})
 		return
 	}
 
-	user, err := c.userRepo.FindUserByEmail(subject)
-	if err != nil {
-		context.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
-		return
-	}
-
-	context.JSON(http.StatusOK, user)
+	context.JSON(http.StatusOK, tokenData)
 }
