@@ -12,8 +12,7 @@ import (
 )
 
 type AuthUsecase struct {
-	logger *slog.Logger
-
+	logger        *slog.Logger
 	jwtRepository *jwtRepository.JWTRepository
 	userRepo      *userRepository.UserRepository
 }
@@ -26,12 +25,34 @@ func NewAuthUsecase(userRepository *userRepository.UserRepository, jwtRepository
 	}
 }
 
-// Authenticate authenticates a user and returns an access token and a refresh token
+// AuthRequest represents the login credentials
+type AuthRequest struct {
+	Email    string `json:"email" binding:"required" example:"user@example.com"`
+	Password string `json:"password" binding:"required" example:"password123"`
+}
+
+// TokenResponse represents the JWT tokens returned on successful authentication
+type TokenResponse struct {
+	AccessToken  string `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+	RefreshToken string `json:"refresh_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+	TokenType    string `json:"token_type" example:"Bearer"`
+	ExpiresIn    int    `json:"expires_in" example:"3600"`
+}
+
+// Authenticate godoc
+// @Summary Authenticate user
+// @Description Authenticate a user with email and password, returns JWT tokens
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param credentials body AuthRequest true "Login credentials"
+// @Success 200 {object} TokenResponse
+// @Failure 400 {object} map[string]string "Invalid request"
+// @Failure 401 {object} map[string]string "Authentication failed"
+// @Failure 500 {object} map[string]string "Server error"
+// @Router /auth [post]
 func (c *AuthUsecase) Authenticate(context *gin.Context) {
-	var input struct {
-		Email    string `json:"email" binding:"required"`
-		Password string `json:"password" binding:"required"`
-	}
+	var input AuthRequest
 	if err := context.BindJSON(&input); err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		return
@@ -58,11 +79,25 @@ func (c *AuthUsecase) Authenticate(context *gin.Context) {
 	context.JSON(http.StatusOK, tokenData)
 }
 
-// Refresh generates a new access token using a refresh token
+// RefreshRequest represents the refresh token request
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+}
+
+// Refresh godoc
+// @Summary Refresh access token
+// @Description Generate a new access token using a valid refresh token
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param refresh_token body RefreshRequest true "Refresh token"
+// @Success 200 {object} TokenResponse
+// @Failure 400 {object} map[string]string "Invalid request"
+// @Failure 401 {object} map[string]string "Invalid refresh token"
+// @Failure 500 {object} map[string]string "Server error"
+// @Router /auth/refresh [post]
 func (c *AuthUsecase) Refresh(context *gin.Context) {
-	var input struct {
-		RefreshToken string `json:"refresh_token" binding:"required"`
-	}
+	var input RefreshRequest
 	if err := context.BindJSON(&input); err != nil {
 		context.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request"})
 		return

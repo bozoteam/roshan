@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	_ "github.com/bozoteam/roshan/docs"
 	"github.com/bozoteam/roshan/internal/helpers"
 	"github.com/bozoteam/roshan/internal/modules/auth/middlewares"
 	jwtRepository "github.com/bozoteam/roshan/internal/modules/auth/repository/jwt"
@@ -16,11 +17,15 @@ import (
 	userRouter "github.com/bozoteam/roshan/internal/modules/user/routes"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // RegisterRoutes registers all routes
 func RegisterRoutes() *gin.Engine {
 	router := gin.Default()
+
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Configure CORS
 	config := cors.DefaultConfig()
