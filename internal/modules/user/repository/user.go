@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"fmt"
 	"log/slog"
 
 	log "github.com/bozoteam/roshan/internal/adapter/log"
@@ -23,6 +24,14 @@ func (c *UserRepository) FindUserByEmail(email string) (*models.User, error) {
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (c *UserRepository) SaveRefreshToken(user *models.User, refreshToken string) error {
+	if err := c.db.Model(user).Update("refresh_token", refreshToken).Error; err != nil {
+		fmt.Println(err)
+		return err
+	}
+	return nil
 }
 
 func (c *UserRepository) FindUserById(id string) (*models.User, error) {

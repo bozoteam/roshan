@@ -74,9 +74,9 @@ func (s *JWTRepository) GenerateAccessAndRefreshTokens(user *models.User) (*Toke
 
 	return &TokenData{
 		AccessToken:       accessToken,
-		ExpiresIn:         now.Add(s.tokenDuration).Unix(),
+		ExpiresIn:         int64(s.tokenDuration.Seconds()),
 		RefreshToken:      refreshToken,
-		RefreshExpiration: now.Add(s.refreshTokenDuration).Unix(),
+		RefreshExpiration: int64((s.refreshTokenDuration).Seconds()),
 		TokenType:         "Bearer",
 		Scope:             "email",
 	}, nil
@@ -89,12 +89,15 @@ func (s *JWTRepository) generateToken(user *models.User, tokenKind TokenKind, no
 	}
 
 	var duration time.Duration
+	var signingKey []byte
 
 	switch tokenKind {
 	case ACCESS_TOKEN:
 		duration = s.tokenDuration
+		signingKey = s.secretKey
 	case REFRESH_TOKEN:
 		duration = s.refreshTokenDuration
+		signingKey = s.refreshSecretKey
 	}
 
 	claims := CustomClaims{
@@ -111,7 +114,7 @@ func (s *JWTRepository) generateToken(user *models.User, tokenKind TokenKind, no
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString(s.secretKey)
+	return token.SignedString(signingKey)
 }
 
 func (s *JWTRepository) ValidateToken(tokenString string, expectedKind TokenKind) (*jwt.Token, *CustomClaims, error) {

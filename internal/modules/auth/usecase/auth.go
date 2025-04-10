@@ -49,6 +49,12 @@ func (c *AuthUsecase) Authenticate(context *gin.Context) {
 		return
 	}
 
+	err = c.userRepo.SaveRefreshToken(user, tokenData.RefreshToken)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate tokens"})
+		return
+	}
+
 	context.JSON(http.StatusOK, tokenData)
 }
 
@@ -81,6 +87,12 @@ func (c *AuthUsecase) Refresh(context *gin.Context) {
 	}
 
 	tokenData, err := c.jwtRepository.GenerateAccessAndRefreshTokens(user)
+	if err != nil {
+		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate tokens"})
+		return
+	}
+
+	err = c.userRepo.SaveRefreshToken(user, tokenData.RefreshToken)
 	if err != nil {
 		context.JSON(http.StatusInternalServerError, gin.H{"error": "Could not generate tokens"})
 		return

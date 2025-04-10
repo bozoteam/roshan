@@ -7,6 +7,13 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// ARGS -> time=40184912;
+//             kind=msg;
+//             user_id=6969420;
+//             user_name=BASE64;
+//             user_email=BASE64;
+//             msg=BASE64;
+
 type Message struct {
 	RoomID  string `json:"room_id"`
 	UserId  string `json:"user_id"`
