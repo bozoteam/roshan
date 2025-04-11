@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package roshan.auth;
+
+import "google/api/annotations.proto";
+import "google/protobuf/descriptor.proto";
+import "options/authorization_required.proto";
+
+option go_package = "github.com/bozoteam/roshan/adapter/grpc/gen/auth;gen";
+
+message AuthenticateRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message AuthenticateResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  string token_type = 3;
+  uint64 expires_in = 4;
+}
+
+message RefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+message RefreshTokenResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  string token_type = 3;
+  uint64 expires_in = 4;
+}
+
+service AuthService {
+  rpc Authenticate(AuthenticateRequest) returns (AuthenticateResponse) {
+    option (roshan.authorization.required) = false;
+    option (google.api.http) = {
+      post: "/api/v1/auth"
+      body: "*"
+    };
+  }
+  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse) {
+    option (roshan.authorization.required) = false;
+    option (google.api.http) = {
+      post: "/api/v1/auth/refresh"
+      body: "*"
+    };
+  }
+}

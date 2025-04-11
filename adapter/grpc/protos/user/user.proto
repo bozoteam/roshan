@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package roshan.user;
+
+import "google/api/annotations.proto";
+import "options/authorization_required.proto";
+
+option go_package = "github.com/bozoteam/roshan/adapter/grpc/gen/user;gen";
+
+message User {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+}
+
+message CreateUserRequest {
+  string name = 1;
+  string email = 2;
+  string password = 3;
+}
+
+message CreateUserResponse {
+  User user = 1;
+}
+
+message UpdateUserRequest {
+  optional string name = 1;
+  optional string email = 2;
+  optional string password = 3;
+}
+
+message UpdateUserResponse {
+  User user = 1;
+}
+
+message DeleteUserRequest {}
+
+message DeleteUserResponse {
+  User user = 1;
+}
+
+message GetUserRequest {}
+
+message GetUserResponse {
+  User user = 1;
+}
+
+service UserService {
+  rpc CreateUser(CreateUserRequest) returns (CreateUserResponse) {
+    option (roshan.authorization.required) = false;
+    option (google.api.http) = {
+      post: "/api/v1/user"
+      body: "*"
+    };
+  }
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse) {
+    option (google.api.http) = {
+      put: "/api/v1/user"
+      body: "*"
+    };
+  }
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse) {
+    option (google.api.http) = {delete: "/api/v1/user"};
+  }
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {
+    option (google.api.http) = {get: "/api/v1/user"};
+  }
+}

@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package roshan.authorization;
+
+import "google/protobuf/descriptor.proto";
+
+option go_package = "github.com/bozoteam/roshan/adapter/grpc/gen/options;auth_required";
+
+extend google.protobuf.MethodOptions {
+  bool required = 50000;
+}
