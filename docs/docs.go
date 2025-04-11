@@ -341,9 +341,34 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Auth token",
+                        "name": "token",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
+                    "400": {
+                        "description": "Token is required",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid token or user not found",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
                     "404": {
                         "description": "Room not found",
                         "schema": {
@@ -588,6 +613,25 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "models.User": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string",
+                    "maxLength": 255
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 255
+                }
+            }
+        },
         "usecase.AuthRequest": {
             "type": "object",
             "required": [
@@ -673,12 +717,8 @@ const docTemplate = `{
                 "users": {
                     "type": "array",
                     "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "00DBA43A-5F6D-46DE-A07C-E76FB55435ED",
-                        "DFD4FC58-6FB7-4CDC-97F6-151E4125B617"
-                    ]
+                        "$ref": "#/definitions/models.User"
+                    }
                 }
             }
         },

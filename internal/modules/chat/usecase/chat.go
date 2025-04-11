@@ -3,38 +3,43 @@ package usecase
 import (
 	"log/slog"
 	"net/http"
-	"sync"
 	"time"
 
 	log "github.com/bozoteam/roshan/internal/adapter/log"
+	jwtRepository "github.com/bozoteam/roshan/internal/modules/auth/repository/jwt"
 	"github.com/bozoteam/roshan/internal/modules/chat/models"
 	userModel "github.com/bozoteam/roshan/internal/modules/user/models"
+	userRepository "github.com/bozoteam/roshan/internal/modules/user/repository"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 )
 
 type ChatUsecase struct {
-	hub      *models.Hub
-	upgrader *websocket.Upgrader
-	logger   *slog.Logger
+	hub            *models.Hub
+	upgrader       *websocket.Upgrader
+	logger         *slog.Logger
+	jwtRepository  *jwtRepository.JWTRepository
+	userRepository *userRepository.UserRepository
 }
 
-func NewChatUsecase() *ChatUsecase {
+func NewChatUsecase(userRepository *userRepository.UserRepository, jwtRepository *jwtRepository.JWTRepository) *ChatUsecase {
 	hub := models.NewHub()
 	go hub.Run()
 	return &ChatUsecase{
-		hub:      hub,
-		upgrader: new(websocket.Upgrader),
-		logger:   log.LogWithModule("chat_usecase"),
+		hub:            hub,
+		upgrader:       new(websocket.Upgrader),
+		logger:         log.LogWithModule("chat_usecase"),
+		userRepository: userRepository,
+		jwtRepository:  jwtRepository,
 	}
 }
 
 // RoomResponse represents a chat room with its users
 type RoomResponse struct {
-	Id      string   `json:"id" example:"f81d4fae-7dec-11d0-a765-00a0c91e6bf6"`
-	Name    string   `json:"name" example:"General Discussion"`
-	UserIds []string `json:"users" example:"00DBA43A-5F6D-46DE-A07C-E76FB55435ED,DFD4FC58-6FB7-4CDC-97F6-151E4125B617"`
+	Id    string            `json:"id" example:"f81d4fae-7dec-11d0-a765-00a0c91e6bf6"`
+	Name  string            `json:"name" example:"General Discussion"`
+	Users []*userModel.User `json:"users"`
 }
 
 // RoomCreateRequest represents data needed to create a chat room
@@ -50,33 +55,6 @@ type RoomCreateResponse struct {
 // MessageRequest represents the structure of a chat message
 type MessageRequest struct {
 	Message string `json:"message" binding:"required" example:"Hello, everyone!"`
-}
-
-// UserInfo represents basic user information for room membership
-type UserInfo struct {
-	ID       string `json:"id" example:"123"`
-	Username string `json:"username" example:"john_doe"`
-}
-
-// Helper function to send user list update event
-func (cc *ChatUsecase) sendUserListUpdate(room *models.Room) {
-	room.Mutex.Lock()
-	defer room.Mutex.Unlock()
-
-	users := make([]*userModel.User, 0, len(room.Clients))
-	for client := range room.Clients {
-		users = append(users, client.User)
-	}
-
-	// Create a user list event
-	event := &models.Event{
-		RoomID:    room.ID,
-		Users:     users,
-		Timestamp: time.Now().Unix(),
-	}
-
-	// Broadcast the event
-	cc.hub.BrodcastEvent <- event
 }
 
 // SendMessage godoc
@@ -97,24 +75,20 @@ func (cc *ChatUsecase) SendMessage(context *gin.Context) {
 	user := context.MustGet("user").(*userModel.User)
 	roomID := context.Param("id")
 
-	cc.hub.Mutex.Lock()
-	room, exists := cc.hub.Rooms[roomID]
-	cc.hub.Mutex.Unlock()
-
-	if !exists {
+	room := cc.hub.GetRoom(roomID)
+	if room == nil {
 		context.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
 		return
 	}
 
+	// Check if user is in room
 	foundUser := false
-	room.Mutex.Lock()
-	for client := range room.Clients {
+	for _, client := range room.Clients {
 		if client.User.Id == user.Id {
 			foundUser = true
 			break
 		}
 	}
-	room.Mutex.Unlock()
 
 	if !foundUser {
 		context.JSON(http.StatusForbidden, gin.H{"error": "User not found in room"})
@@ -130,13 +104,13 @@ func (cc *ChatUsecase) SendMessage(context *gin.Context) {
 	// Create message with proper metadata
 	message := &models.Message{
 		RoomID:    roomID,
-		UserID:    user.Id,
+		User:      user,
 		Content:   input.Message,
 		Timestamp: time.Now().Unix(),
 	}
 
 	// Broadcast the message
-	cc.hub.BroadcastMessage <- message
+	cc.hub.BroadcastMessage(message)
 	context.JSON(http.StatusOK, nil)
 }
 
@@ -167,15 +141,14 @@ func (cc *ChatUsecase) CreateRoom(context *gin.Context) {
 		return
 	}
 
-	room := models.Room{
+	room := &models.Room{
 		ID:        uuid.String(),
-		CreatorId: user.Id,
 		Name:      input.RoomName,
-		Clients:   make(map[*models.RoomClient]bool),
-		Mutex:     &sync.Mutex{},
+		CreatorID: user.Id,
+		Clients:   make(map[string]*models.Client),
 	}
 
-	cc.hub.Register <- &room
+	cc.hub.CreateRoom(room)
 	context.JSON(http.StatusOK, RoomCreateResponse{Id: room.ID})
 }
 
@@ -187,28 +160,25 @@ func (cc *ChatUsecase) CreateRoom(context *gin.Context) {
 // @Success 200 {array} RoomResponse
 // @Router /chat/rooms [get]
 func (cc *ChatUsecase) ListRooms(context *gin.Context) {
-	cc.hub.Mutex.Lock()
-	defer cc.hub.Mutex.Unlock()
+	rooms := cc.hub.ListRooms()
 
-	rooms := make([]RoomResponse, 0, len(cc.hub.Rooms))
-	for _, room := range cc.hub.Rooms {
-		room.Mutex.Lock()
-		users := make([]string, 0, len(room.Clients))
-		for client := range room.Clients {
-			users = append(users, client.Id)
+	responseRooms := make([]RoomResponse, 0, len(rooms))
+	for _, room := range rooms {
+		clients := make([]*userModel.User, 0, len(room.Clients))
+		for _, client := range room.Clients {
+			clients = append(clients, client.User)
 		}
 
-		roomResponse := RoomResponse{
-			Id:      room.ID,
-			Name:    room.Name,
-			UserIds: users,
+		responseRoom := RoomResponse{
+			Id:    room.ID,
+			Name:  room.Name,
+			Users: clients,
 		}
-		room.Mutex.Unlock()
 
-		rooms = append(rooms, roomResponse)
+		responseRooms = append(responseRooms, responseRoom)
 	}
 
-	context.JSON(http.StatusOK, rooms)
+	context.JSON(http.StatusOK, responseRooms)
 }
 
 // DeleteRoom godoc
@@ -224,16 +194,14 @@ func (cc *ChatUsecase) ListRooms(context *gin.Context) {
 func (cc *ChatUsecase) DeleteRoom(c *gin.Context) {
 	roomID := c.Param("id")
 
-	cc.hub.Mutex.Lock()
-	room, exists := cc.hub.Rooms[roomID]
-	cc.hub.Mutex.Unlock()
-
-	if exists {
-		cc.hub.Unregister <- room
-		c.JSON(http.StatusOK, gin.H{"status": "deleted"})
-	} else {
+	room := cc.hub.GetRoom(roomID)
+	if room == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
+		return
 	}
+
+	cc.hub.DeleteRoom(roomID)
+	c.JSON(http.StatusOK, gin.H{"status": "deleted"})
 }
 
 // HandleWebSocket godoc
@@ -241,18 +209,32 @@ func (cc *ChatUsecase) DeleteRoom(c *gin.Context) {
 // @Description Establish a WebSocket connection to a specific chat room
 // @Tags chat
 // @Param id path string true "Room ID"
+// @Param token query string true "Auth token"
 // @Security BearerAuth
+// @Failure 400 {object} map[string]string "Token is required"
+// @Failure 401 {object} map[string]string "Invalid token or user not found"
 // @Failure 404 {object} map[string]string "Room not found"
 // @Router /chat/rooms/{id}/ws [get]
 func (cc *ChatUsecase) HandleWebSocket(context *gin.Context) {
-	user := context.MustGet("user").(*userModel.User)
 	roomID := context.Param("id")
+	token, ok := context.GetQuery("token")
+	if !ok {
+		context.JSON(http.StatusBadRequest, gin.H{"error": "Token is required"})
+		return
+	}
+	_, claims, err := cc.jwtRepository.ValidateToken(token, jwtRepository.ACCESS_TOKEN)
+	if err != nil {
+		context.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		return
+	}
+	user, err := cc.userRepository.FindUserById(claims.Subject)
+	if err != nil {
+		context.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
+		return
+	}
 
-	cc.hub.Mutex.Lock()
-	room, exists := cc.hub.Rooms[roomID]
-	cc.hub.Mutex.Unlock()
-
-	if !exists {
+	room := cc.hub.GetRoom(roomID)
+	if room == nil {
 		context.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
 		return
 	}
@@ -266,42 +248,24 @@ func (cc *ChatUsecase) HandleWebSocket(context *gin.Context) {
 		return
 	}
 
-	roomUser := &models.RoomClient{
-		User: user,
-		Conn: conn,
-	}
+	// Create unregister channel
+	unregister := make(chan *models.Client)
 
-	// Add user to the room
-	room.Mutex.Lock()
-	room.Clients[roomUser] = true
-	room.Mutex.Unlock()
+	// Create client
+	client := models.NewClient(user, conn, roomID, unregister)
 
-	// Send user list update after adding user
-	cc.sendUserListUpdate(room)
+	// Start goroutines for reading and writing
+	go client.ReadPump(cc.hub)
+	go client.WritePump(cc.hub)
+
+	// Register client to room
+	cc.hub.Register(client, roomID)
 
 	cc.logger.Info("User connected to room", "user_id", user.Id, "room_id", roomID)
 
-	defer func() {
-		conn.Close()
-
-		// Remove user from the room
-		room.Mutex.Lock()
-		delete(room.Clients, roomUser)
-		room.Mutex.Unlock()
-
-		cc.logger.Info("User disconnected from room", "user_id", user.Id, "room_id", roomID)
-
-		// Send updated user list after removing user
-		cc.sendUserListUpdate(room)
-	}()
-
-	// Keep connection alive but don't process messages
-	for {
-		// Only handle ping/pong or connection close events
-		_, _, err := conn.ReadMessage()
-		if err != nil {
-			break
-		}
-		// Don't process or broadcast messages from websocket
-	}
+	// Handle unregistration when the client disconnects
+	// This runs in the same goroutine as HandleWebSocket
+	clientToUnregister := <-unregister
+	cc.hub.Unregister(clientToUnregister, roomID)
+	cc.logger.Info("User disconnected from room", "user_id", user.Id, "room_id", roomID)
 }

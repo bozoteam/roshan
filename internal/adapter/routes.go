@@ -43,7 +43,7 @@ func RegisterRoutes() *gin.Engine {
 	jwtRepository := jwtRepository.NewJWTRepository()
 	authUsecase := authUsecase.NewAuthUsecase(userRepository, jwtRepository)
 	authMiddleware := middlewares.NewAuthMiddleware(jwtRepository, userRepository)
-	chatUsecase := chatUsecase.NewChatUsecase()
+	chatUsecase := chatUsecase.NewChatUsecase(userRepository, jwtRepository)
 
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{

@@ -21,5 +21,5 @@ func RegisterChatRoutes(router *gin.Engine, authMiddleware *middlewares.AuthMidd
 	// router.GET("/chat/rooms/:id/users", authReqUser, chatUsecase.ListUsers)
 	router.DELETE("/chat/rooms/:id", authReqUser, chatUsecase.DeleteRoom)
 
-	router.GET("/chat/rooms/:id/ws", authReqUser, chatUsecase.HandleWebSocket)
+	router.GET("/chat/rooms/:id/ws", chatUsecase.HandleWebSocket)
 }

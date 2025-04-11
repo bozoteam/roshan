@@ -1,4 +1,17 @@
 definitions:
+  models.User:
+    properties:
+      email:
+        maxLength: 255
+        type: string
+      id:
+        type: string
+      name:
+        maxLength: 255
+        type: string
+    required:
+    - name
+    type: object
   usecase.AuthRequest:
     properties:
       email:
@@ -56,11 +69,8 @@ definitions:
         example: General Discussion
         type: string
       users:
-        example:
-        - 00DBA43A-5F6D-46DE-A07C-E76FB55435ED
-        - DFD4FC58-6FB7-4CDC-97F6-151E4125B617
         items:
-          type: string
+          $ref: '#/definitions/models.User'
         type: array
     type: object
   usecase.TokenResponse:
@@ -295,7 +305,24 @@ paths:
         name: id
         required: true
         type: string
+      - description: Auth token
+        in: query
+        name: token
+        required: true
+        type: string
       responses:
+        "400":
+          description: Token is required
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Invalid token or user not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "404":
           description: Room not found
           schema:
