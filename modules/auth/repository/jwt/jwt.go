@@ -9,11 +9,11 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-type TokenKind int
+type TokenType int
 
 const (
-	ACCESS_TOKEN  TokenKind = 0
-	REFRESH_TOKEN TokenKind = 1
+	ACCESS_TOKEN  TokenType = 0
+	REFRESH_TOKEN TokenType = 1
 )
 
 func NewJWTRepository() *JWTRepository {
@@ -36,7 +36,7 @@ type JWTRepository struct {
 
 type CustomClaims struct {
 	Email     string    `json:"email"`
-	TokenKind TokenKind `json:"token_kind"` // "access" or "refresh"
+	TokenType TokenType `json:"token_type"` // "access" or "refresh"
 	jwt.RegisteredClaims
 }
 
@@ -80,13 +80,13 @@ func (s *JWTRepository) GenerateAccessAndRefreshTokens(user *models.User) (*Toke
 	}, nil
 }
 
-func (s *JWTRepository) generateToken(user *models.User, tokenKind TokenKind, now time.Time) (string, error) {
+func (s *JWTRepository) generateToken(user *models.User, tokenType TokenType, now time.Time) (string, error) {
 	uuid := helpers.GenUUID()
 
 	var duration time.Duration
 	var signingKey []byte
 
-	switch tokenKind {
+	switch tokenType {
 	case ACCESS_TOKEN:
 		duration = s.tokenDuration
 		signingKey = s.secretKey
@@ -96,7 +96,7 @@ func (s *JWTRepository) generateToken(user *models.User, tokenKind TokenKind, no
 	}
 
 	claims := CustomClaims{
-		TokenKind: tokenKind,
+		TokenType: tokenType,
 		Email:     user.Email,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        uuid,
@@ -112,7 +112,7 @@ func (s *JWTRepository) generateToken(user *models.User, tokenKind TokenKind, no
 	return token.SignedString(signingKey)
 }
 
-func (s *JWTRepository) ValidateToken(tokenString string, expectedKind TokenKind) (*jwt.Token, *CustomClaims, error) {
+func (s *JWTRepository) ValidateToken(tokenString string, expectedKind TokenType) (*jwt.Token, *CustomClaims, error) {
 	claims := &CustomClaims{}
 
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
@@ -131,7 +131,7 @@ func (s *JWTRepository) ValidateToken(tokenString string, expectedKind TokenKind
 		return nil, nil, err
 	}
 
-	if claims.TokenKind != expectedKind {
+	if claims.TokenType != expectedKind {
 		return nil, nil, errors.New("invalid token kind")
 	}
 
