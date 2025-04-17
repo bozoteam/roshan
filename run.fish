@@ -14,3 +14,5 @@ end
 
 ./migrate.fish
 ./apply.fish
+
+go run ./cmd/server/main.go
