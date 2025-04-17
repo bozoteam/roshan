@@ -20,3 +20,4 @@ services:
       retries: 5
 volumes:
   roshan_postgres_data:
+    name: roshan_postgres_data
