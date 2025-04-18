@@ -10,7 +10,7 @@ end
 
 trap cleanup SIGINT SIGTERM
 
-docker compose up -d
+docker compose up -d; or cleanup
 
 while true
     echo "Waiting for PostgreSQL to be ready..."
@@ -22,7 +22,7 @@ while true
     sleep 1
 end
 
-./migrate.fish
-./apply.fish
+./migrate.fish; or cleanup
+./apply.fish; or cleanup
 
-go run ./cmd/server/main.go
+go run ./cmd/server/main.go; or cleanup
