@@ -147,7 +147,7 @@ func (cc *ChatUsecase) DeleteRoom(ctx context.Context, roomId string) (*RoomResp
 		return nil, errors.New("not room creator!")
 	}
 
-	users := make([]*userModel.User, len(room.Clients))
+	users := make([]*userModel.User, 0, len(room.Clients))
 	for _, user := range room.Clients {
 		users = append(users, user.User)
 	}
