@@ -1,5 +1,15 @@
 #!/usr/bin/env fish
 
+function cleanup
+    echo "Cleaning up..."
+    docker compose down
+    # Kill any running go processes started by this script
+    pkill -P (echo %self)
+    exit 0
+end
+
+trap cleanup SIGINT SIGTERM
+
 docker compose up -d
 
 while true
