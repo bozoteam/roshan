@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Chat Application Test</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+      }
+      .container {
+        display: flex;
+        gap: 20px;
+      }
+      .panel {
+        flex: 1;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        padding: 15px;
+      }
+      .chat-window {
+        flex: 2;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        display: flex;
+        flex-direction: column;
+        height: 600px;
+      }
+      .chat-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 10px 15px;
+        border-bottom: 1px solid #ddd;
+        background-color: #f5f5f5;
+      }
+      .message-area {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding: 15px;
+        background-color: #f9f9f9;
+      }
+      .input-area {
+        display: flex;
+        padding: 10px;
+        border-top: 1px solid #ddd;
+      }
+      .input-area input {
+        flex-grow: 1;
+        padding: 8px;
+        margin-right: 10px;
+      }
+      .message {
+        margin-bottom: 10px;
+        padding: 8px 12px;
+        border-radius: 8px;
+        max-width: 70%;
+        word-wrap: break-word;
+      }
+      .user-message {
+        background-color: #dcf8c6;
+        align-self: flex-end;
+        margin-left: auto;
+      }
+      .other-message {
+        background-color: #ffffff;
+        border: 1px solid #ddd;
+      }
+      .system-message {
+        background-color: #e1e1f9;
+        border: 1px solid #ddd;
+        color: #555;
+        font-style: italic;
+        text-align: center;
+        max-width: 100%;
+        margin: 5px auto;
+      }
+      .room-item,
+      .user-item {
+        padding: 8px;
+        margin-bottom: 5px;
+        border-radius: 4px;
+        cursor: pointer;
+        background-color: #f1f1f1;
+      }
+      .room-item:hover,
+      .user-item:hover {
+        background-color: #e1e1e1;
+      }
+      .active {
+        background-color: #4caf50 !important;
+        color: white;
+      }
+      button {
+        padding: 8px 12px;
+        background-color: #4caf50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+      button:hover {
+        background-color: #45a049;
+      }
+      button:disabled {
+        background-color: #cccccc;
+        cursor: not-allowed;
+      }
+      input,
+      button {
+        margin-bottom: 10px;
+      }
+      .auth-panel {
+        margin-bottom: 20px;
+        padding: 15px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+      h3 {
+        margin-top: 0;
+      }
+      #statusIndicator {
+        margin-left: 10px;
+        font-size: 14px;
+      }
+      .online {
+        color: green;
+      }
+      .offline {
+        color: red;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>
+      Chat Application Test
+      <span id="statusIndicator" class="offline">(Offline)</span>
+    </h1>
+    <div class="auth-panel">
+      <h3>Authentication</h3>
+      <input
+        type="text"
+        id="emailInput"
+        placeholder="Email"
+        value="marcellao@email.com"
+      />
+      <input
+        type="password"
+        id="passwordInput"
+        placeholder="Password"
+        value="marcellao"
+      />
+      <button id="loginBtn">Login</button>
+      <button id="logoutBtn">Logout</button>
+    </div>
+    <div class="container">
+      <div class="panel">
+        <h3>Rooms</h3>
+        <input type="text" id="roomNameInput" placeholder="Room Name" />
+        <button id="createRoomBtn">Create Room</button>
+        <button id="refreshRoomsBtn">Refresh Rooms</button>
+        <div id="roomsList"></div>
+      </div>
+      <div class="chat-window">
+        <div class="chat-header">
+          <h3 id="roomTitle">Chat</h3>
+          <div>
+            <button id="pingBtn" disabled>PING</button>
+            <button id="exitRoomBtn" disabled>Exit Room</button>
+          </div>
+        </div>
+        <div class="message-area" id="messageArea">
+          <div class="message system-message">
+            Select a room to start chatting
+          </div>
+        </div>
+        <div class="input-area">
+          <input
+            type="text"
+            id="messageInput"
+            placeholder="Type a message..."
+            disabled
+          />
+          <button id="sendBtn" disabled>Send</button>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Users in Room</h3>
+        <div id="usersList"></div>
+      </div>
+    </div>
+    <script>
+      // Configuration
+      const API_URL = "http://localhost:8080"; // Replace with your actual API URL
+      // State
+      let accessToken = "";
+      let refreshToken = "";
+      let currentRoomId = "";
+      let currentUser = null;
+      let socket = null;
+      // Elements
+      const emailInput = document.getElementById("emailInput");
+      const passwordInput = document.getElementById("passwordInput");
+      const loginBtn = document.getElementById("loginBtn");
+      const logoutBtn = document.getElementById("logoutBtn");
+      const roomNameInput = document.getElementById("roomNameInput");
+      const createRoomBtn = document.getElementById("createRoomBtn");
+      const refreshRoomsBtn = document.getElementById("refreshRoomsBtn");
+      const roomsList = document.getElementById("roomsList");
+      const usersList = document.getElementById("usersList");
+      const messageArea = document.getElementById("messageArea");
+      const messageInput = document.getElementById("messageInput");
+      const sendBtn = document.getElementById("sendBtn");
+      const statusIndicator = document.getElementById("statusIndicator");
+      const exitRoomBtn = document.getElementById("exitRoomBtn");
+      const roomTitle = document.getElementById("roomTitle");
+      const pingBtn = document.getElementById("pingBtn");
+
+      // Event Listeners
+      loginBtn.addEventListener("click", login);
+      logoutBtn.addEventListener("click", logout);
+      createRoomBtn.addEventListener("click", createRoom);
+      refreshRoomsBtn.addEventListener("click", fetchRooms);
+      sendBtn.addEventListener("click", sendMessage);
+      exitRoomBtn.addEventListener("click", exitRoom);
+      messageInput.addEventListener("keypress", function (e) {
+        if (e.key === "Enter") sendMessage();
+      });
+      // Check for saved token on page load
+      window.addEventListener("load", () => {
+        const savedToken = localStorage.getItem("accessToken");
+        if (savedToken) {
+          accessToken = savedToken;
+          refreshToken = localStorage.getItem("refreshToken");
+          updateUIAfterLogin();
+          fetchRooms();
+        }
+      });
+      pingBtn.addEventListener("click", sendPing);
+
+      // Functions
+      function sendPing() {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          // Send a ping frame
+          socket.send(JSON.stringify({ type: "ping" }));
+          // socket.ping();
+          // socket.ping
+
+          // Show a system message
+          addSystemMessage("PING sent");
+
+          // Start a timer to measure response time
+          const pingTime = Date.now();
+
+          // Create one-time event listener for pong response
+          const pongHandler = function (event) {
+            const data = JSON.parse(event.data);
+            if (data.type === "pong") {
+              const latency = Date.now() - pingTime;
+              addSystemMessage(`PONG received (latency: ${latency}ms)`);
+              socket.removeEventListener("message", pongHandler);
+            }
+          };
+
+          socket.addEventListener("message", pongHandler);
+
+          // Set a timeout in case we don't get a response
+          setTimeout(() => {
+            socket.removeEventListener("message", pongHandler);
+          }, 10000); // 10 second timeout
+        } else {
+          addSystemMessage("Cannot send PING: Not connected to a room");
+        }
+      }
+      async function login() {
+        try {
+          const response = await fetch(`${API_URL}/api/v1/auth`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: emailInput.value,
+              password: passwordInput.value,
+            }),
+          });
+          if (!response.ok) {
+            throw new Error("Login failed");
+          }
+          const data = await response.json();
+          accessToken = data.access_token;
+          refreshToken = data.refresh_token;
+          // Save tokens
+          localStorage.setItem("accessToken", accessToken);
+          localStorage.setItem("refreshToken", refreshToken);
+          updateUIAfterLogin();
+          fetchRooms();
+        } catch (error) {
+          console.error("Login error:", error);
+          alert("Login failed: " + error.message);
+        }
+      }
+      function updateUIAfterLogin() {
+        statusIndicator.textContent = "(Online)";
+        statusIndicator.className = "online";
+        emailInput.disabled = true;
+        passwordInput.disabled = true;
+        loginBtn.disabled = true;
+        logoutBtn.disabled = false;
+        createRoomBtn.disabled = false;
+        refreshRoomsBtn.disabled = false;
+      }
+      function logout() {
+        // Close websocket if open
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.close();
+        }
+        // Clear state
+        accessToken = "";
+        refreshToken = "";
+        currentRoomId = "";
+        localStorage.removeItem("accessToken");
+        localStorage.removeItem("refreshToken");
+        // Reset UI
+        statusIndicator.textContent = "(Offline)";
+        statusIndicator.className = "offline";
+        emailInput.disabled = false;
+        passwordInput.disabled = false;
+        loginBtn.disabled = false;
+        logoutBtn.disabled = true;
+        createRoomBtn.disabled = true;
+        refreshRoomsBtn.disabled = true;
+        messageInput.disabled = true;
+        sendBtn.disabled = true;
+        exitRoomBtn.disabled = true;
+        roomTitle.textContent = "Chat";
+        // Clear displayed data
+        roomsList.innerHTML = "";
+        usersList.innerHTML = "";
+        messageArea.innerHTML =
+          '<div class="message system-message">Select a room to start chatting</div>';
+      }
+      function exitRoom() {
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.close();
+        }
+
+        currentRoomId = "";
+
+        // Update UI
+        document.querySelectorAll(".room-item").forEach((item) => {
+          item.classList.remove("active");
+        });
+
+        messageArea.innerHTML =
+          '<div class="message system-message">Select a room to start chatting</div>';
+        usersList.innerHTML = "";
+        roomTitle.textContent = "Chat";
+
+        // Disable message input and buttons
+        messageInput.disabled = true;
+        sendBtn.disabled = true;
+        exitRoomBtn.disabled = true;
+        pingBtn.disabled = true;
+      }
+      async function createRoom() {
+        if (!accessToken || !roomNameInput.value.trim()) return;
+        try {
+          const response = await fetch(`${API_URL}/api/v1/chat/rooms`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({
+              room_name: roomNameInput.value.trim(),
+            }),
+          });
+          if (!response.ok) {
+            throw new Error("Failed to create room");
+          }
+          const data = await response.json();
+          console.log("Room created:", data);
+          roomNameInput.value = "";
+          // Refresh rooms list
+          fetchRooms();
+        } catch (error) {
+          console.error("Create room error:", error);
+          alert("Failed to create room: " + error.message);
+        }
+      }
+      async function fetchRooms() {
+        if (!accessToken) return;
+        try {
+          const response = await fetch(`${API_URL}/api/v1/chat/rooms`, {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          });
+          if (!response.ok) {
+            throw new Error("Failed to fetch rooms");
+          }
+          const rooms = await response.json();
+          displayRooms(rooms);
+        } catch (error) {
+          console.error("Fetch rooms error:", error);
+          alert("Failed to fetch rooms: " + error.message);
+        }
+      }
+      function displayRooms(rooms) {
+        roomsList.innerHTML = "";
+        if (rooms.length === 0) {
+          roomsList.innerHTML =
+            '<div class="message system-message">No rooms available</div>';
+          return;
+        }
+        rooms.rooms.forEach((room) => {
+          const roomElement = document.createElement("div");
+          roomElement.className = "room-item";
+          roomElement.textContent = room.name ? room.name : `Room ${room.id}`;
+          roomElement.dataset.id = room.id;
+          if (room.id === currentRoomId) {
+            roomElement.classList.add("active");
+          }
+          roomElement.addEventListener("click", () => joinRoom(room.id));
+          roomsList.appendChild(roomElement);
+        });
+      }
+      function joinRoom(roomId) {
+        // If already connected to this room, do nothing
+        if (
+          currentRoomId === roomId &&
+          socket &&
+          socket.readyState === WebSocket.OPEN
+        )
+          return;
+        // Close existing connection if any
+        if (socket && socket.readyState === WebSocket.OPEN) {
+          socket.close();
+        }
+        // Update room selection UI
+        document.querySelectorAll(".room-item").forEach((item) => {
+          item.classList.remove("active");
+          if (item.dataset.id === roomId) {
+            item.classList.add("active");
+          }
+        });
+        currentRoomId = roomId;
+
+        // Find room name from the room list
+        const roomElement = document.querySelector(
+          `.room-item[data-id="${roomId}"]`,
+        );
+        if (roomElement) {
+          roomTitle.textContent = roomElement.textContent;
+        } else {
+          roomTitle.textContent = `Room ${roomId}`;
+        }
+
+        // Enable exit button
+        exitRoomBtn.disabled = false;
+
+        // Enable exit button and ping button
+        exitRoomBtn.disabled = false;
+        pingBtn.disabled = false;
+
+        // Clear messages and users
+        messageArea.innerHTML = "";
+        usersList.innerHTML = "";
+        // Add system message
+        addSystemMessage("Connecting to room...");
+        // Enable message input
+        messageInput.disabled = false;
+        sendBtn.disabled = false;
+        // Create a custom WebSocket connection using fetch for the initial handshake
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const host = API_URL.replace(/^https?:\/\//, "");
+        const wsUrl = `${protocol}//${host}/api/v1/chat/rooms/${roomId}/ws`;
+        const wsUrlWithToken = `${wsUrl}?token=${encodeURIComponent(accessToken)}`;
+        console.log("Connecting to WebSocket:", wsUrlWithToken);
+        socket = new WebSocket(wsUrlWithToken);
+        socket.onopen = function () {
+          console.log("WebSocket connected");
+          addSystemMessage("Connected to room");
+        };
+        socket.onmessage = function (event) {
+          // Check if it's a PING message (not JSON)
+          if (event.data === "PING") {
+            console.log("Received PING, sending PONG");
+            socket.send("PONG");
+            return;
+          }
+
+          try {
+            const data = JSON.parse(event.data);
+            console.log("Message received:", data);
+            // Check if it's a user list update
+            if (data.users) {
+              displayUsers(data.users);
+              addSystemMessage(`${data.users.length} users in the room`);
+            }
+            // Regular message
+            else if (data.user && data.user.id && data.content) {
+              addMessage(data);
+            }
+          } catch (e) {
+            console.log("Received non-JSON message:", event.data);
+          }
+        };
+        socket.onclose = function (event) {
+          console.log("WebSocket closed:", event.code, event.reason);
+          addSystemMessage(
+            `Disconnected from room (${event.code}: ${event.reason || "No reason provided"})`,
+          );
+          messageInput.disabled = true;
+          sendBtn.disabled = true;
+          pingBtn.disabled = true;
+        };
+        socket.onerror = function (error) {
+          console.error("WebSocket error:", error);
+          addSystemMessage("Error connecting to room");
+          messageInput.disabled = true;
+          sendBtn.disabled = true;
+        };
+        socket.onping = () => console.log("Received ping");
+      }
+      function displayUsers(users) {
+        usersList.innerHTML = "";
+        if (users.length === 0) {
+          usersList.innerHTML =
+            '<div class="message system-message">No users in room</div>';
+          return;
+        }
+        users.forEach((user) => {
+          const userElement = document.createElement("div");
+          userElement.className = "user-item";
+          userElement.textContent = user.email || user.id;
+          if (user.id === currentUser?.id) {
+            userElement.textContent += " (You)";
+            userElement.classList.add("active");
+          }
+          usersList.appendChild(userElement);
+        });
+      }
+      async function sendMessage() {
+        if (!accessToken || !currentRoomId || !messageInput.value.trim())
+          return;
+        try {
+          const response = await fetch(
+            `${API_URL}/api/v1/chat/rooms/message`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${accessToken}`,
+              },
+              body: JSON.stringify({
+                content: messageInput.value.trim(),
+                room_id: currentRoomId,
+              }),
+            },
+          );
+          if (!response.ok) {
+            throw new Error("Failed to send message");
+          }
+          console.log("Message sent");
+          messageInput.value = "";
+        } catch (error) {
+          console.error("Send message error:", error);
+          addSystemMessage("Failed to send message: " + error.message);
+        }
+      }
+      function addMessage(message) {
+        const messageElement = document.createElement("div");
+        messageElement.className = "message";
+        // Check if it's the current user's message
+        const isCurrentUser = message.user.id === currentUser?.id;
+        messageElement.classList.add(
+          isCurrentUser ? "user-message" : "other-message",
+        );
+        // Format timestamp
+        const date = new Date(message.timestamp * 1000);
+        const timeString = date.toLocaleTimeString();
+        // Create message content with sender info and time
+        const sender = isCurrentUser ? "You" : message.user.email;
+        messageElement.innerHTML = `
+                <div><strong>${sender}</strong> <small>${timeString}</small></div>
+                <div>${message.content}</div>
+            `;
+        messageArea.appendChild(messageElement);
+        // Scroll to bottom
+        messageArea.scrollTop = messageArea.scrollHeight;
+      }
+      function addSystemMessage(text) {
+        const messageElement = document.createElement("div");
+        messageElement.className = "message system-message";
+        messageElement.textContent = text;
+        messageArea.appendChild(messageElement);
+        // Scroll to bottom
+        messageArea.scrollTop = messageArea.scrollHeight;
+      }
+      // Initialize
+      logoutBtn.disabled = true;
+      createRoomBtn.disabled = true;
+      refreshRoomsBtn.disabled = true;
+    </script>
+  </body>
+</html>
