@@ -115,7 +115,8 @@
       "type": "object",
       "properties": {
         "refreshToken": {
-          "type": "string"
+          "type": "string",
+          "title": "can be sent by cookie"
         }
       }
     },

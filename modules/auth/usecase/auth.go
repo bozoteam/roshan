@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
 
 	"context"
@@ -10,6 +11,8 @@ import (
 	"github.com/bozoteam/roshan/helpers"
 	jwtRepository "github.com/bozoteam/roshan/modules/auth/repository/jwt"
 	userRepository "github.com/bozoteam/roshan/modules/user/repository"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 )
 
 type AuthUsecase struct {
@@ -40,7 +43,7 @@ var (
 	ErrInvalidToken   = errors.New("invalid token")
 )
 
-func (c *AuthUsecase) Authenticate(context context.Context, email string, password string) (*TokenResponse, error) {
+func (c *AuthUsecase) Authenticate(ctx context.Context, email string, password string) (*TokenResponse, error) {
 	user, err := c.userRepo.FindUserByEmail(email)
 	if err != nil || !helpers.CheckPasswordHash(password, user.Password) {
 		return nil, ErrAuthFailed
@@ -56,6 +59,8 @@ func (c *AuthUsecase) Authenticate(context context.Context, email string, passwo
 		return nil, errors.New("could not generate token")
 	}
 
+	c.setRefreshTokenCookie(ctx, tokenData)
+
 	return &TokenResponse{
 		AccessToken:  tokenData.AccessToken,
 		RefreshToken: tokenData.RefreshToken,
@@ -67,6 +72,20 @@ func (c *AuthUsecase) Authenticate(context context.Context, email string, passwo
 // RefreshRequest represents the refresh token request
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+}
+
+func (c *AuthUsecase) setRefreshTokenCookie(ctx context.Context, tokenData *jwtRepository.TokenData) {
+	md := metadata.Pairs(
+		"Set-Cookie", fmt.Sprintf("refresh_token=%s; HttpOnly; SameSite=Strict; Path=/api; Max-Age=%d",
+			tokenData.RefreshToken,
+			int(tokenData.ExpiresIn)),
+	)
+	if err := grpc.SetHeader(ctx, md); err != nil {
+		c.logger.Error("Failed to set cookie header", "error", err)
+		// Log error but don't fail the request
+		// log.Printf("Failed to set cookie header: %v", err)
+	}
+
 }
 
 func (c *AuthUsecase) Refresh(ctx context.Context, refreshToken string) (*TokenResponse, error) {
@@ -94,6 +113,8 @@ func (c *AuthUsecase) Refresh(ctx context.Context, refreshToken string) (*TokenR
 	if err != nil {
 		return nil, ErrInvalidToken
 	}
+
+	c.setRefreshTokenCookie(ctx, tokenData)
 
 	return &TokenResponse{
 		AccessToken:  tokenData.AccessToken,

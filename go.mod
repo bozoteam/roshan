@@ -11,6 +11,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/jackc/pgx/v5 v5.7.4
 	github.com/joho/godotenv v1.5.1
+	github.com/speps/go-hashids/v2 v2.0.1
 	golang.org/x/crypto v0.37.0
 	golang.org/x/net v0.39.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20250409194420-de1ac958c67a

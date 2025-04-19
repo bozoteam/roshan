@@ -61,8 +61,8 @@ type MessageRequest struct {
 	Message string `json:"message" binding:"required" example:"Hello, everyone!"`
 }
 
-func (cc *ChatUsecase) SendMessage(context context.Context, content string, roomId string) error {
-	user := context.Value("user").(*userModel.User)
+func (cc *ChatUsecase) SendMessage(ctx context.Context, content string, roomId string) error {
+	user := ctx.Value("user").(*userModel.User)
 
 	room := cc.hub.GetRoom(roomId)
 	if room == nil {

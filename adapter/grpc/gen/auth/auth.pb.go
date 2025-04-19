@@ -145,8 +145,9 @@ func (x *AuthenticateResponse) GetExpiresIn() uint64 {
 }
 
 type RefreshTokenRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RefreshToken  string                 `protobuf:"bytes,1,opt,name=refresh_token,json=refreshToken,proto3" json:"refresh_token,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// can be sent by cookie
+	RefreshToken  *string `protobuf:"bytes,1,opt,name=refresh_token,json=refreshToken,proto3,oneof" json:"refresh_token,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -182,8 +183,8 @@ func (*RefreshTokenRequest) Descriptor() ([]byte, []int) {
 }
 
 func (x *RefreshTokenRequest) GetRefreshToken() string {
-	if x != nil {
-		return x.RefreshToken
+	if x != nil && x.RefreshToken != nil {
+		return *x.RefreshToken
 	}
 	return ""
 }
@@ -270,9 +271,10 @@ const file_auth_auth_proto_rawDesc = "" +
 	"\n" +
 	"token_type\x18\x03 \x01(\tR\ttokenType\x12\x1d\n" +
 	"\n" +
-	"expires_in\x18\x04 \x01(\x04R\texpiresIn\":\n" +
-	"\x13RefreshTokenRequest\x12#\n" +
-	"\rrefresh_token\x18\x01 \x01(\tR\frefreshToken\"\x9c\x01\n" +
+	"expires_in\x18\x04 \x01(\x04R\texpiresIn\"Q\n" +
+	"\x13RefreshTokenRequest\x12(\n" +
+	"\rrefresh_token\x18\x01 \x01(\tH\x00R\frefreshToken\x88\x01\x01B\x10\n" +
+	"\x0e_refresh_token\"\x9c\x01\n" +
 	"\x14RefreshTokenResponse\x12!\n" +
 	"\faccess_token\x18\x01 \x01(\tR\vaccessToken\x12#\n" +
 	"\rrefresh_token\x18\x02 \x01(\tR\frefreshToken\x12\x1d\n" +
@@ -320,6 +322,7 @@ func file_auth_auth_proto_init() {
 	if File_auth_auth_proto != nil {
 		return
 	}
+	file_auth_auth_proto_msgTypes[2].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

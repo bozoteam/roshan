@@ -33,9 +33,12 @@ type Client struct {
 	PingNotify chan struct{}   `json:"-"`
 }
 
+
+
 // Room represents a chat room
 type Room struct {
 	ID         string
+	FriendlyId string
 	Name       string
 	CreatorID  string
 	Clients    map[string]*Client

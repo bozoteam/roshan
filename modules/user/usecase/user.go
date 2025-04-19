@@ -33,7 +33,7 @@ type UserCreateInput struct {
 	Password string `json:"password" binding:"required" example:"securepassword"`
 }
 
-func (c *UserUsecase) CreateUser(context context.Context, useReq *UserCreateInput) (*models.User, error) {
+func (c *UserUsecase) CreateUser(ctx context.Context, useReq *UserCreateInput) (*models.User, error) {
 	hashedPassword, err := helpers.HashPassword(useReq.Password)
 	if err != nil {
 		return nil, errors.New("internal server error")
@@ -69,8 +69,8 @@ type UserUpdateInput struct {
 	Password *string `json:"password" example:"newsecurepassword"`
 }
 
-func (c *UserUsecase) UpdateUser(context context.Context, input *UserUpdateInput) (*models.User, error) {
-	user := context.Value("user").(*models.User)
+func (c *UserUsecase) UpdateUser(ctx context.Context, input *UserUpdateInput) (*models.User, error) {
+	user := ctx.Value("user").(*models.User)
 
 	if input.Name != nil {
 		user.Name = *input.Name
@@ -100,8 +100,8 @@ func (c *UserUsecase) UpdateUser(context context.Context, input *UserUpdateInput
 	return user, nil
 }
 
-func (c *UserUsecase) DeleteUser(context context.Context) (*models.User, error) {
-	user := context.Value("user").(*models.User)
+func (c *UserUsecase) DeleteUser(ctx context.Context) (*models.User, error) {
+	user := ctx.Value("user").(*models.User)
 
 	if err := c.userRepo.DeleteUser(user); err != nil {
 		return nil, errors.New("user not found")
@@ -110,7 +110,7 @@ func (c *UserUsecase) DeleteUser(context context.Context) (*models.User, error) 
 	return user, nil
 }
 
-func (c *UserUsecase) GetUser(context context.Context) (*models.User, error) {
-	user := context.Value("user").(*models.User)
+func (c *UserUsecase) GetUser(ctx context.Context) (*models.User, error) {
+	user := ctx.Value("user").(*models.User)
 	return user, nil
 }

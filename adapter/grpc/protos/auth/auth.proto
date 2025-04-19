@@ -21,7 +21,8 @@ message AuthenticateResponse {
 }
 
 message RefreshTokenRequest {
-  string refresh_token = 1;
+  // can be sent by cookie
+  optional string refresh_token = 1;
 }
 
 message RefreshTokenResponse {
