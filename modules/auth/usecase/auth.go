@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 
 	"context"
@@ -11,8 +10,6 @@ import (
 	"github.com/bozoteam/roshan/helpers"
 	jwtRepository "github.com/bozoteam/roshan/modules/auth/repository/jwt"
 	userRepository "github.com/bozoteam/roshan/modules/user/repository"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/metadata"
 )
 
 type AuthUsecase struct {
@@ -31,10 +28,11 @@ func NewAuthUsecase(userRepository *userRepository.UserRepository, jwtRepository
 
 // TokenResponse represents the JWT tokens returned on successful authentication
 type TokenResponse struct {
-	AccessToken  string `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
-	RefreshToken string `json:"refresh_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
-	TokenType    string `json:"token_type" example:"Bearer"`
-	ExpiresIn    int    `json:"expires_in" example:"3600"`
+	AccessToken      string `json:"access_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+	RefreshToken     string `json:"refresh_token" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
+	TokenType        string `json:"token_type" example:"Bearer"`
+	ExpiresIn        uint64 `json:"expires_in" example:"3600"`
+	RefreshExpiresIn uint64 `json:"refresh_expires_in" example:"3600"`
 }
 
 var (
@@ -59,33 +57,18 @@ func (c *AuthUsecase) Authenticate(ctx context.Context, email string, password s
 		return nil, errors.New("could not generate token")
 	}
 
-	c.setRefreshTokenCookie(ctx, tokenData)
-
 	return &TokenResponse{
-		AccessToken:  tokenData.AccessToken,
-		RefreshToken: tokenData.RefreshToken,
-		TokenType:    tokenData.TokenType,
-		ExpiresIn:    int(tokenData.ExpiresIn),
+		AccessToken:      tokenData.AccessToken,
+		RefreshToken:     tokenData.RefreshToken,
+		TokenType:        tokenData.TokenType,
+		ExpiresIn:        tokenData.ExpiresIn,
+		RefreshExpiresIn: tokenData.RefreshExpiresIn,
 	}, nil
 }
 
 // RefreshRequest represents the refresh token request
 type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
-}
-
-func (c *AuthUsecase) setRefreshTokenCookie(ctx context.Context, tokenData *jwtRepository.TokenData) {
-	md := metadata.Pairs(
-		"Set-Cookie", fmt.Sprintf("refresh_token=%s; HttpOnly; SameSite=Strict; Path=/api; Max-Age=%d",
-			tokenData.RefreshToken,
-			int(tokenData.RefreshExpiration)),
-	)
-	if err := grpc.SetHeader(ctx, md); err != nil {
-		c.logger.Error("Failed to set cookie header", "error", err)
-		// Log error but don't fail the request
-		// log.Printf("Failed to set cookie header: %v", err)
-	}
-
 }
 
 func (c *AuthUsecase) Refresh(ctx context.Context, refreshToken string) (*TokenResponse, error) {
@@ -114,12 +97,11 @@ func (c *AuthUsecase) Refresh(ctx context.Context, refreshToken string) (*TokenR
 		return nil, ErrInvalidToken
 	}
 
-	c.setRefreshTokenCookie(ctx, tokenData)
-
 	return &TokenResponse{
-		AccessToken:  tokenData.AccessToken,
-		RefreshToken: tokenData.RefreshToken,
-		TokenType:    tokenData.TokenType,
-		ExpiresIn:    int(tokenData.ExpiresIn),
+		AccessToken:      tokenData.AccessToken,
+		RefreshToken:     tokenData.RefreshToken,
+		TokenType:        tokenData.TokenType,
+		ExpiresIn:        tokenData.ExpiresIn,
+		RefreshExpiresIn: tokenData.RefreshExpiresIn,
 	}, nil
 }

@@ -2,11 +2,13 @@ package auth_service
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	gen "github.com/bozoteam/roshan/adapter/grpc/gen/auth"
 	"github.com/bozoteam/roshan/modules/auth/usecase"
 	"github.com/bozoteam/roshan/roshan_errors"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 )
 
@@ -21,47 +23,69 @@ func NewAuthService(authUsecase *usecase.AuthUsecase) *AuthService {
 	}
 }
 
+func (c *AuthService) setRefreshTokenCookie(ctx context.Context, token string, expiration uint64) {
+	md := metadata.Pairs(
+		"Set-Cookie", fmt.Sprintf("refresh_token=%s; HttpOnly; SameSite=Strict; Path=/api; Max-Age=%d",
+			token,
+			expiration,
+		),
+		"Cache-Control", "no-store",
+	)
+	if err := grpc.SetHeader(ctx, md); err != nil {
+		// Log error but don't fail the request
+		// log.Printf("Failed to set cookie header: %v", err)
+	}
+
+}
+
 func (s *AuthService) Authenticate(ctx context.Context, req *gen.AuthenticateRequest) (*gen.AuthenticateResponse, error) {
 	tokenData, err := s.authUsecase.Authenticate(ctx, req.Email, req.Password)
 	if err != nil {
 		return nil, err
 	}
 
+	s.setRefreshTokenCookie(ctx, tokenData.RefreshToken, tokenData.RefreshExpiresIn)
+
 	return &gen.AuthenticateResponse{
-		AccessToken:  tokenData.AccessToken,
-		RefreshToken: tokenData.RefreshToken,
-		TokenType:    tokenData.TokenType,
-		ExpiresIn:    uint64(tokenData.ExpiresIn),
+		RefreshExpiresIn: tokenData.RefreshExpiresIn,
+		AccessToken:      tokenData.AccessToken,
+		RefreshToken:     tokenData.RefreshToken,
+		TokenType:        tokenData.TokenType,
+		ExpiresIn:        tokenData.ExpiresIn,
 	}, nil
 }
 
-func (s *AuthService) RefreshToken(ctx context.Context, req *gen.RefreshTokenRequest) (*gen.RefreshTokenResponse, error) {
+func (s *AuthService) RefreshToken(ctx context.Context, req *gen.RefreshTokenRequest) (*gen.AuthenticateResponse, error) {
 	var inputRefreshToken string
 
 	if req.RefreshToken != nil {
 		inputRefreshToken = *req.RefreshToken
 	} else {
-		// get from cookie not sure TODO: check
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {
 			return nil, roshan_errors.ErrInvalidInput
 		}
 
 		cookieValues := md.Get("cookie")
-		if len(cookieValues) == 0 {
+		if len(cookieValues) != 1 {
 			return nil, roshan_errors.ErrInvalidInput
 		}
 
-		header := http.Header{}
-		header.Add("Cookie", cookieValues[0])
-		request := http.Request{Header: header}
+		cookieStr := cookieValues[0]
 
-		cookie, err := request.Cookie("refresh_token")
-		if err != nil || cookie.Value == "" {
+		cookies, err := http.ParseCookie(cookieStr)
+		if err != nil {
 			return nil, roshan_errors.ErrInvalidInput
 		}
 
-		inputRefreshToken = cookie.Value
+		for _, cookie := range cookies {
+			if cookie.Name == "refresh_token" {
+				inputRefreshToken = cookie.Value
+				break
+			}
+		}
+
+		return nil, roshan_errors.ErrInvalidInput
 	}
 
 	tokenData, err := s.authUsecase.Refresh(ctx, inputRefreshToken)
@@ -69,10 +93,13 @@ func (s *AuthService) RefreshToken(ctx context.Context, req *gen.RefreshTokenReq
 		return nil, err
 	}
 
-	return &gen.RefreshTokenResponse{
-		AccessToken:  tokenData.AccessToken,
-		RefreshToken: tokenData.RefreshToken,
-		TokenType:    tokenData.TokenType,
-		ExpiresIn:    uint64(tokenData.ExpiresIn),
+	s.setRefreshTokenCookie(ctx, tokenData.RefreshToken, tokenData.RefreshExpiresIn)
+
+	return &gen.AuthenticateResponse{
+		RefreshExpiresIn: tokenData.RefreshExpiresIn,
+		AccessToken:      tokenData.AccessToken,
+		RefreshToken:     tokenData.RefreshToken,
+		TokenType:        tokenData.TokenType,
+		ExpiresIn:        tokenData.ExpiresIn,
 	}, nil
 }

@@ -18,18 +18,12 @@ message AuthenticateResponse {
   string refresh_token = 2;
   string token_type = 3;
   uint64 expires_in = 4;
+  uint64 refresh_expires_in = 5;
 }
 
 message RefreshTokenRequest {
   // can be sent by cookie
   optional string refresh_token = 1;
-}
-
-message RefreshTokenResponse {
-  string access_token = 1;
-  string refresh_token = 2;
-  string token_type = 3;
-  uint64 expires_in = 4;
 }
 
 service AuthService {
@@ -40,7 +34,7 @@ service AuthService {
       body: "*"
     };
   }
-  rpc RefreshToken(RefreshTokenRequest) returns (RefreshTokenResponse) {
+  rpc RefreshToken(RefreshTokenRequest) returns (AuthenticateResponse) {
     option (roshan.authorization.required) = false;
     option (google.api.http) = {
       post: "/api/v1/auth/refresh"

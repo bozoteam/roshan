@@ -49,12 +49,12 @@ func (c *JWTRepository) GetTokenKeyFunc(token *jwt.Token) (any, error) {
 }
 
 type TokenData struct {
-	AccessToken       string `json:"access_token"`
-	ExpiresIn         int64  `json:"expires_in"`
-	RefreshToken      string `json:"refresh_token"`
-	RefreshExpiration int64  `json:"refresh_expires_in"`
-	TokenType         string `json:"token_type"`
-	Scope             string `json:"scope"`
+	AccessToken      string `json:"access_token"`
+	ExpiresIn        uint64 `json:"expires_in"`
+	RefreshToken     string `json:"refresh_token"`
+	RefreshExpiresIn uint64 `json:"refresh_expires_in"`
+	TokenType        string `json:"token_type"`
+	Scope            string `json:"scope"`
 }
 
 func (s *JWTRepository) GenerateAccessAndRefreshTokens(user *models.User) (*TokenData, error) {
@@ -71,12 +71,12 @@ func (s *JWTRepository) GenerateAccessAndRefreshTokens(user *models.User) (*Toke
 	}
 
 	return &TokenData{
-		AccessToken:       accessToken,
-		ExpiresIn:         int64(s.tokenDuration.Seconds()),
-		RefreshToken:      refreshToken,
-		RefreshExpiration: int64((s.refreshTokenDuration).Seconds()),
-		TokenType:         "Bearer",
-		Scope:             "email",
+		AccessToken:      accessToken,
+		ExpiresIn:        uint64(s.tokenDuration.Seconds()),
+		RefreshToken:     refreshToken,
+		RefreshExpiresIn: uint64((s.refreshTokenDuration).Seconds()),
+		TokenType:        "Bearer",
+		Scope:            "email",
 	}, nil
 }
 
