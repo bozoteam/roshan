@@ -109,5 +109,5 @@ func (c *AuthUsecase) Refresh(ctx context.Context, refreshToken string) (*TokenR
 
 func (c *AuthUsecase) Logout(ctx context.Context) error {
 	user := ctx.Value("user").(*userModel.User)
-	return c.jwtRepository.DeleteRefreshToken(user)
+	return c.userRepo.DeleteRefreshToken(user)
 }

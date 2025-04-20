@@ -76,3 +76,10 @@ func (c *UserRepository) DeleteUser(user *models.User) error {
 	}
 	return nil
 }
+
+func (c *UserRepository) DeleteRefreshToken(user *models.User) error {
+	if err := c.db.Model(user).Update("refresh_token", nil).Error; err != nil {
+		return err
+	}
+	return nil
+}
