@@ -78,7 +78,7 @@ func (c *AuthUsecase) setRefreshTokenCookie(ctx context.Context, tokenData *jwtR
 	md := metadata.Pairs(
 		"Set-Cookie", fmt.Sprintf("refresh_token=%s; HttpOnly; SameSite=Strict; Path=/api; Max-Age=%d",
 			tokenData.RefreshToken,
-			int(tokenData.ExpiresIn)),
+			int(tokenData.RefreshExpiration)),
 	)
 	if err := grpc.SetHeader(ctx, md); err != nil {
 		c.logger.Error("Failed to set cookie header", "error", err)
