@@ -94,14 +94,18 @@ func (s *AuthService) RefreshToken(ctx context.Context, req *gen.RefreshTokenReq
 			return nil, roshan_errors.ErrInvalidInput
 		}
 
+		var found bool
 		for _, cookie := range cookies {
 			if cookie.Name == "refresh_token" {
+				found = true
 				inputRefreshToken = cookie.Value
 				break
 			}
 		}
 
-		return nil, roshan_errors.ErrInvalidInput
+		if !found {
+			return nil, roshan_errors.ErrInvalidInput
+		}
 	}
 
 	tokenData, err := s.authUsecase.Refresh(ctx, inputRefreshToken)
