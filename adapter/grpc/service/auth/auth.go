@@ -48,6 +48,18 @@ func (c *AuthService) setRefreshTokenCookie(ctx context.Context, token string, e
 
 }
 
+func (c *AuthService) deleteRefreshTokenCookie(ctx context.Context) {
+	md := metadata.Pairs(
+		"Set-Cookie", fmt.Sprintf("refresh_token=\"\"; HttpOnly; SameSite=Strict; Path=/api; Max-Age=0"),
+		"Cache-Control", "no-store",
+	)
+	if err := grpc.SetHeader(ctx, md); err != nil {
+		// Log error but don't fail the request
+		// log.Printf("Failed to set cookie header: %v", err)
+	}
+
+}
+
 func (s *AuthService) Authenticate(ctx context.Context, req *gen.AuthenticateRequest) (*gen.AuthenticateResponse, error) {
 	tokenData, err := s.authUsecase.Authenticate(ctx, req.Email, req.Password)
 	if err != nil {
@@ -100,4 +112,12 @@ func (s *AuthService) RefreshToken(ctx context.Context, req *gen.RefreshTokenReq
 	s.setRefreshTokenCookie(ctx, tokenData.RefreshToken, tokenData.RefreshExpiresIn)
 
 	return genAuthResponseFromToken(tokenData), nil
+}
+
+func (s *AuthService) Logout(ctx context.Context, req *gen.LogoutRequest) (*gen.LogoutResponse, error) {
+	s.authUsecase.Logout(ctx)
+
+	s.deleteRefreshTokenCookie(ctx)
+
+	return &gen.LogoutResponse{}, nil
 }

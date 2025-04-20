@@ -141,3 +141,7 @@ func (s *JWTRepository) ValidateToken(tokenString string, expectedKind TokenType
 
 	return token, claims, err
 }
+
+func (s *JWTRepository) DeleteRefreshToken(user *models.User) error {
+	return nil
+}

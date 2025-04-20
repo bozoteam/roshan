@@ -26,6 +26,9 @@ message RefreshTokenRequest {
   optional string refresh_token = 1;
 }
 
+message LogoutResponse {}
+message LogoutRequest {}
+
 service AuthService {
   rpc Authenticate(AuthenticateRequest) returns (AuthenticateResponse) {
     option (roshan.authorization.required) = false;
@@ -40,5 +43,8 @@ service AuthService {
       post: "/api/v1/auth/refresh"
       body: "*"
     };
+  }
+  rpc Logout(LogoutRequest) returns (LogoutResponse) {
+    option (google.api.http) = {post: "/api/v1/auth/logout"};
   }
 }

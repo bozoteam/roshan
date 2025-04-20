@@ -9,6 +9,7 @@ import (
 	log "github.com/bozoteam/roshan/adapter/log"
 	"github.com/bozoteam/roshan/helpers"
 	jwtRepository "github.com/bozoteam/roshan/modules/auth/repository/jwt"
+	userModel "github.com/bozoteam/roshan/modules/user/models"
 	userRepository "github.com/bozoteam/roshan/modules/user/repository"
 )
 
@@ -104,4 +105,9 @@ func (c *AuthUsecase) Refresh(ctx context.Context, refreshToken string) (*TokenR
 		ExpiresIn:        tokenData.ExpiresIn,
 		RefreshExpiresIn: tokenData.RefreshExpiresIn,
 	}, nil
+}
+
+func (c *AuthUsecase) Logout(ctx context.Context) error {
+	user := ctx.Value("user").(*userModel.User)
+	return c.jwtRepository.DeleteRefreshToken(user)
 }
