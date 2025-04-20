@@ -14,6 +14,12 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+var (
+	ErrInvalidToken     = status.Error(codes.Unauthenticated, "invalid token")
+	ErrWrongTokenFormat = status.Error(codes.Unauthenticated, "wrong token format")
+	ErrMissingToken     = status.Error(codes.Unauthenticated, "missing token")
+)
+
 type AuthMiddleware struct {
 	logger             *slog.Logger
 	jwtRepository      *jwtRepository.JWTRepository
@@ -32,37 +38,37 @@ func (m *AuthMiddleware) UnaryInterceptor(ctx context.Context, req any, info *gr
 
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "missing token")
+		return nil, ErrMissingToken
 	}
 
 	authorization, ok := md["authorization"]
 	if !ok {
-		return nil, status.Error(codes.Unauthenticated, "missing token")
+		return nil, ErrMissingToken
 	}
 
 	if len(authorization) != 1 {
-		return nil, status.Error(codes.Unauthenticated, "wrong token format")
+		return nil, ErrWrongTokenFormat
 	}
 
 	_token := strings.Split(authorization[0], " ")
 	if len(_token) != 2 {
-		return nil, status.Error(codes.Unauthenticated, "wrong token format")
+		return nil, ErrWrongTokenFormat
 	}
 	token := _token[1]
 
 	_, claims, err := m.jwtRepository.ValidateToken(token, jwtRepository.ACCESS_TOKEN)
 	if err != nil {
-		return nil, status.Error(codes.Unauthenticated, "invalid token")
+		return nil, ErrInvalidToken
 	}
 
 	subject, err := claims.GetSubject()
 	if err != nil {
-		return nil, status.Error(codes.Unauthenticated, "invalid token")
+		return nil, ErrInvalidToken
 	}
 
 	user, err := m.userRepository.FindUserById(subject)
 	if err != nil {
-		return nil, status.Error(codes.Unauthenticated, "invalid token")
+		return nil, ErrInvalidToken
 	}
 
 	ctx = context.WithValue(ctx, "user", user)
