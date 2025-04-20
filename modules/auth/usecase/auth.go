@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"errors"
 	"log/slog"
 
 	"context"
@@ -11,6 +10,7 @@ import (
 	jwtRepository "github.com/bozoteam/roshan/modules/auth/repository/jwt"
 	userModel "github.com/bozoteam/roshan/modules/user/models"
 	userRepository "github.com/bozoteam/roshan/modules/user/repository"
+	"github.com/bozoteam/roshan/roshan_errors"
 )
 
 type AuthUsecase struct {
@@ -36,26 +36,20 @@ type TokenResponse struct {
 	RefreshExpiresIn uint64 `json:"refresh_expires_in" example:"3600"`
 }
 
-var (
-	ErrAuthFailed     = errors.New("authentication failed")
-	ErrInvalidRequest = errors.New("invalid request")
-	ErrInvalidToken   = errors.New("invalid token")
-)
-
 func (c *AuthUsecase) Authenticate(ctx context.Context, email string, password string) (*TokenResponse, error) {
 	user, err := c.userRepo.FindUserByEmail(email)
 	if err != nil || !helpers.CheckPasswordHash(password, user.Password) {
-		return nil, ErrAuthFailed
+		return nil, roshan_errors.ErrAuthFailed
 	}
 
 	tokenData, err := c.jwtRepository.GenerateAccessAndRefreshTokens(user)
 	if err != nil {
-		return nil, errors.New("could not generate token")
+		return nil, roshan_errors.ErrInternalServerError
 	}
 
 	err = c.userRepo.SaveRefreshToken(user, tokenData.RefreshToken)
 	if err != nil {
-		return nil, errors.New("could not generate token")
+		return nil, roshan_errors.ErrInternalServerError
 	}
 
 	return &TokenResponse{
@@ -75,27 +69,27 @@ type RefreshRequest struct {
 func (c *AuthUsecase) Refresh(ctx context.Context, refreshToken string) (*TokenResponse, error) {
 	_, claims, err := c.jwtRepository.ValidateToken(refreshToken, jwtRepository.REFRESH_TOKEN)
 	if err != nil {
-		return nil, ErrInvalidToken
+		return nil, roshan_errors.ErrInvalidToken
 	}
 
 	subject := claims.Subject
 	if subject == "" {
-		return nil, ErrInvalidToken
+		return nil, roshan_errors.ErrInvalidToken
 	}
 
 	user, err := c.userRepo.FindUserByIdAndToken(subject, refreshToken)
 	if err != nil {
-		return nil, ErrInvalidToken
+		return nil, roshan_errors.ErrInvalidToken
 	}
 
 	tokenData, err := c.jwtRepository.GenerateAccessAndRefreshTokens(user)
 	if err != nil {
-		return nil, ErrInvalidToken
+		return nil, roshan_errors.ErrInvalidToken
 	}
 
 	err = c.userRepo.SaveRefreshToken(user, tokenData.RefreshToken)
 	if err != nil {
-		return nil, ErrInvalidToken
+		return nil, roshan_errors.ErrInvalidToken
 	}
 
 	return &TokenResponse{

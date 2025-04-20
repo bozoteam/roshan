@@ -79,19 +79,19 @@ func (s *AuthService) RefreshToken(ctx context.Context, req *gen.RefreshTokenReq
 	} else {
 		md, ok := metadata.FromIncomingContext(ctx)
 		if !ok {
-			return nil, roshan_errors.ErrInvalidInput
+			return nil, roshan_errors.ErrInvalidRequest
 		}
 
 		cookieValues := md.Get("cookie")
 		if len(cookieValues) != 1 {
-			return nil, roshan_errors.ErrInvalidInput
+			return nil, roshan_errors.ErrInvalidRequest
 		}
 
 		cookieStr := cookieValues[0]
 
 		cookies, err := http.ParseCookie(cookieStr)
 		if err != nil {
-			return nil, roshan_errors.ErrInvalidInput
+			return nil, roshan_errors.ErrInvalidRequest
 		}
 
 		var found bool
@@ -104,7 +104,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, req *gen.RefreshTokenReq
 		}
 
 		if !found {
-			return nil, roshan_errors.ErrInvalidInput
+			return nil, roshan_errors.ErrInvalidRequest
 		}
 	}
 

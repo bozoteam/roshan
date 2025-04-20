@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"errors"
 	"log/slog"
 	"net/http"
 	"time"
@@ -16,6 +15,8 @@ import (
 	userRepository "github.com/bozoteam/roshan/modules/user/repository"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type ChatUsecase struct {
@@ -61,12 +62,18 @@ type MessageRequest struct {
 	Message string `json:"message" binding:"required" example:"Hello, everyone!"`
 }
 
+var (
+	ErrRoomNotFound       = status.Error(codes.NotFound, "room not found")
+	ErrUserNotFoundInRoom = status.Error(codes.PermissionDenied, "user not found in room")
+	ErrUserNotCreator     = status.Error(codes.PermissionDenied, "user cannot delete room, not creator")
+)
+
 func (cc *ChatUsecase) SendMessage(ctx context.Context, content string, roomId string) error {
 	user := ctx.Value("user").(*userModel.User)
 
 	room := cc.hub.GetRoom(roomId)
 	if room == nil {
-		return errors.New("room not found")
+		return ErrRoomNotFound
 	}
 
 	// Check if user is in room
@@ -79,7 +86,7 @@ func (cc *ChatUsecase) SendMessage(ctx context.Context, content string, roomId s
 	}
 
 	if !foundUser {
-		return errors.New("user not found in room")
+		return ErrUserNotFoundInRoom
 	}
 
 	// Create message with proper metadata
@@ -140,11 +147,11 @@ func (cc *ChatUsecase) DeleteRoom(ctx context.Context, roomId string) (*RoomResp
 
 	room := cc.hub.GetRoom(roomId)
 	if room == nil {
-		return nil, errors.New("room does not exist")
+		return nil, ErrRoomNotFound
 	}
 
 	if room.CreatorID != user.Id {
-		return nil, errors.New("not room creator!")
+		return nil, ErrUserNotCreator
 	}
 
 	users := make([]*userModel.User, 0, len(room.Clients))

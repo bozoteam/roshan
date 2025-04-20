@@ -1,7 +1,6 @@
 package usecase
 
 import (
-	"errors"
 	"log/slog"
 
 	"context"
@@ -11,6 +10,8 @@ import (
 	"github.com/bozoteam/roshan/modules/user/models"
 	userRepository "github.com/bozoteam/roshan/modules/user/repository"
 	"github.com/bozoteam/roshan/roshan_errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"gorm.io/gorm"
 )
 
@@ -33,10 +34,15 @@ type UserCreateInput struct {
 	Password string `json:"password" binding:"required" example:"securepassword"`
 }
 
+var (
+	ErrEmailAlreadyExists = status.Error(codes.AlreadyExists, "Email already exists")
+	ErrUserNotFound       = status.Error(codes.NotFound, "User not found")
+)
+
 func (c *UserUsecase) CreateUser(ctx context.Context, useReq *UserCreateInput) (*models.User, error) {
 	hashedPassword, err := helpers.HashPassword(useReq.Password)
 	if err != nil {
-		return nil, errors.New("internal server error")
+		return nil, roshan_errors.ErrInternalServerError
 	}
 
 	id := helpers.GenUUID()
@@ -49,12 +55,12 @@ func (c *UserUsecase) CreateUser(ctx context.Context, useReq *UserCreateInput) (
 	}
 
 	if err := models.ValidateUser(user); err != nil {
-		return nil, roshan_errors.ErrInvalidInput
+		return nil, roshan_errors.ErrInvalidRequest
 	}
 
 	if err := c.userRepo.SaveUser(user); err != nil {
 		if helpers.IsErrorCode(err, "23505") {
-			return nil, errors.New("user email already exists")
+			return nil, ErrEmailAlreadyExists
 		}
 		return nil, roshan_errors.ErrInternalServerError
 	}
@@ -87,12 +93,12 @@ func (c *UserUsecase) UpdateUser(ctx context.Context, input *UserUpdateInput) (*
 	}
 
 	if err := models.ValidateUser(user); err != nil {
-		return nil, errors.New("Invalid user data")
+		return nil, roshan_errors.ErrInvalidRequest
 	}
 
 	if err := c.userRepo.SaveUser(user); err != nil {
 		if helpers.IsErrorCode(err, "23505") {
-			return nil, errors.New("user already exists")
+			return nil, ErrEmailAlreadyExists
 		}
 		return nil, roshan_errors.ErrInternalServerError
 	}
@@ -104,7 +110,7 @@ func (c *UserUsecase) DeleteUser(ctx context.Context) (*models.User, error) {
 	user := ctx.Value("user").(*models.User)
 
 	if err := c.userRepo.DeleteUser(user); err != nil {
-		return nil, errors.New("user not found")
+		return nil, ErrUserNotFound
 	}
 
 	return user, nil
