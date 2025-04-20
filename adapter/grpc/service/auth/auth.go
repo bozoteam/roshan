@@ -23,6 +23,16 @@ func NewAuthService(authUsecase *usecase.AuthUsecase) *AuthService {
 	}
 }
 
+func genAuthResponseFromToken(token *usecase.TokenResponse) *gen.AuthenticateResponse {
+	return &gen.AuthenticateResponse{
+		RefreshExpiresIn: token.RefreshExpiresIn,
+		AccessToken:      token.AccessToken,
+		RefreshToken:     token.RefreshToken,
+		TokenType:        token.TokenType,
+		ExpiresIn:        token.ExpiresIn,
+	}
+}
+
 func (c *AuthService) setRefreshTokenCookie(ctx context.Context, token string, expiration uint64) {
 	md := metadata.Pairs(
 		"Set-Cookie", fmt.Sprintf("refresh_token=%s; HttpOnly; SameSite=Strict; Path=/api; Max-Age=%d",
@@ -46,13 +56,7 @@ func (s *AuthService) Authenticate(ctx context.Context, req *gen.AuthenticateReq
 
 	s.setRefreshTokenCookie(ctx, tokenData.RefreshToken, tokenData.RefreshExpiresIn)
 
-	return &gen.AuthenticateResponse{
-		RefreshExpiresIn: tokenData.RefreshExpiresIn,
-		AccessToken:      tokenData.AccessToken,
-		RefreshToken:     tokenData.RefreshToken,
-		TokenType:        tokenData.TokenType,
-		ExpiresIn:        tokenData.ExpiresIn,
-	}, nil
+	return genAuthResponseFromToken(tokenData), nil
 }
 
 func (s *AuthService) RefreshToken(ctx context.Context, req *gen.RefreshTokenRequest) (*gen.AuthenticateResponse, error) {
@@ -95,11 +99,5 @@ func (s *AuthService) RefreshToken(ctx context.Context, req *gen.RefreshTokenReq
 
 	s.setRefreshTokenCookie(ctx, tokenData.RefreshToken, tokenData.RefreshExpiresIn)
 
-	return &gen.AuthenticateResponse{
-		RefreshExpiresIn: tokenData.RefreshExpiresIn,
-		AccessToken:      tokenData.AccessToken,
-		RefreshToken:     tokenData.RefreshToken,
-		TokenType:        tokenData.TokenType,
-		ExpiresIn:        tokenData.ExpiresIn,
-	}, nil
+	return genAuthResponseFromToken(tokenData), nil
 }
