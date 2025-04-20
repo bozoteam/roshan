@@ -13,9 +13,3 @@ var (
 	ErrInvalidInput        = status.Error(codes.InvalidArgument, "invalid input")
 	ErrInternalServerError = status.Error(codes.Internal, "internal server error")
 )
-
-var (
-	ErrInvalidToken     = status.Error(codes.Unauthenticated, "invalid token")
-	ErrWrongTokenFormat = status.Error(codes.Unauthenticated, "wrong token format")
-	ErrMissingToken     = status.Error(codes.Unauthenticated, "missing token")
-)
