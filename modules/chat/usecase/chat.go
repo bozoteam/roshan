@@ -102,7 +102,7 @@ func (u *ChatUsecase) SendMessage(ctx context.Context, content string, roomId st
 	return nil
 }
 
-func (u *ChatUsecase) CreateRoom(ctx context.Context, name string) (string, error) {
+func (u *ChatUsecase) CreateRoom(ctx context.Context, name string) (*models.Room, error) {
 	user := ctx.Value("user").(*userModel.User)
 
 	uuid := helpers.GenUUID()
@@ -116,7 +116,7 @@ func (u *ChatUsecase) CreateRoom(ctx context.Context, name string) (string, erro
 
 	u.hub.CreateRoom(room)
 
-	return uuid, nil
+	return room, nil
 }
 
 func (u *ChatUsecase) ListRooms(ctx context.Context) ([]*RoomResponse, error) {

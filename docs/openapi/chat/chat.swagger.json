@@ -143,8 +143,8 @@
     "chatCreateRoomResponse": {
       "type": "object",
       "properties": {
-        "roomId": {
-          "type": "string"
+        "room": {
+          "$ref": "#/definitions/chatRoom"
         }
       }
     },
@@ -175,6 +175,9 @@
           "type": "string"
         },
         "creatorId": {
+          "type": "string"
+        },
+        "name": {
           "type": "string"
         },
         "users": {

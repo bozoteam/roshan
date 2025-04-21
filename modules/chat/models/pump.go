@@ -36,6 +36,11 @@ func (c *Client) ReadPump(hub *Hub) {
 			c.PingNotify <- struct{}{}
 			continue
 		}
+		if string(msg) == "PING" {
+			fmt.Println("Received PING")
+			c.writeMessage([]byte("PONG"), true)
+			fmt.Println("SENDING PONG")
+		}
 	}
 }
 

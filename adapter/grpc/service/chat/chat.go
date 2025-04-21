@@ -29,13 +29,18 @@ func (s *ChatService) SendMessage(ctx context.Context, req *gen.SendMessageReque
 }
 
 func (s *ChatService) CreateRoom(ctx context.Context, req *gen.CreateRoomRequest) (*gen.CreateRoomResponse, error) {
-	id, err := s.chatUsecase.CreateRoom(ctx, req.Name)
+	room, err := s.chatUsecase.CreateRoom(ctx, req.Name)
 	if err != nil {
 		return nil, err
 	}
 
 	return &gen.CreateRoomResponse{
-		RoomId: id,
+		Room: &gen.Room{
+			Name:      room.Name,
+			Id:        room.ID,
+			CreatorId: room.CreatorID,
+			Users:     nil,
+		},
 	}, nil
 }
 
@@ -60,6 +65,7 @@ func (s *ChatService) ListRooms(ctx context.Context, req *gen.ListRoomsRequest) 
 			Id:        room.Id,
 			CreatorId: room.CreatorId,
 			Users:     users,
+			Name:      room.Name,
 		})
 
 	}
