@@ -36,18 +36,18 @@ type TokenResponse struct {
 	RefreshExpiresIn uint64 `json:"refresh_expires_in" example:"3600"`
 }
 
-func (c *AuthUsecase) Authenticate(ctx context.Context, email string, password string) (*TokenResponse, error) {
-	user, err := c.userRepo.FindUserByEmail(email)
+func (u *AuthUsecase) Authenticate(ctx context.Context, email string, password string) (*TokenResponse, error) {
+	user, err := u.userRepo.FindUserByEmail(email)
 	if err != nil || !helpers.CheckPasswordHash(password, user.Password) {
 		return nil, roshan_errors.ErrAuthFailed
 	}
 
-	tokenData, err := c.jwtRepository.GenerateAccessAndRefreshTokens(user)
+	tokenData, err := u.jwtRepository.GenerateAccessAndRefreshTokens(user)
 	if err != nil {
 		return nil, roshan_errors.ErrInternalServerError
 	}
 
-	err = c.userRepo.SaveRefreshToken(user, tokenData.RefreshToken)
+	err = u.userRepo.SaveRefreshToken(user, tokenData.RefreshToken)
 	if err != nil {
 		return nil, roshan_errors.ErrInternalServerError
 	}
@@ -66,8 +66,8 @@ type RefreshRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required" example:"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."`
 }
 
-func (c *AuthUsecase) Refresh(ctx context.Context, refreshToken string) (*TokenResponse, error) {
-	_, claims, err := c.jwtRepository.ValidateToken(refreshToken, jwtRepository.REFRESH_TOKEN)
+func (u *AuthUsecase) Refresh(ctx context.Context, refreshToken string) (*TokenResponse, error) {
+	_, claims, err := u.jwtRepository.ValidateToken(refreshToken, jwtRepository.REFRESH_TOKEN)
 	if err != nil {
 		return nil, roshan_errors.ErrInvalidToken
 	}
@@ -77,17 +77,17 @@ func (c *AuthUsecase) Refresh(ctx context.Context, refreshToken string) (*TokenR
 		return nil, roshan_errors.ErrInvalidToken
 	}
 
-	user, err := c.userRepo.FindUserByIdAndToken(subject, refreshToken)
+	user, err := u.userRepo.FindUserByIdAndToken(subject, refreshToken)
 	if err != nil {
 		return nil, roshan_errors.ErrInvalidToken
 	}
 
-	tokenData, err := c.jwtRepository.GenerateAccessAndRefreshTokens(user)
+	tokenData, err := u.jwtRepository.GenerateAccessAndRefreshTokens(user)
 	if err != nil {
 		return nil, roshan_errors.ErrInvalidToken
 	}
 
-	err = c.userRepo.SaveRefreshToken(user, tokenData.RefreshToken)
+	err = u.userRepo.SaveRefreshToken(user, tokenData.RefreshToken)
 	if err != nil {
 		return nil, roshan_errors.ErrInvalidToken
 	}
@@ -101,7 +101,7 @@ func (c *AuthUsecase) Refresh(ctx context.Context, refreshToken string) (*TokenR
 	}, nil
 }
 
-func (c *AuthUsecase) Logout(ctx context.Context) error {
+func (u *AuthUsecase) Logout(ctx context.Context) error {
 	user := ctx.Value("user").(*userModel.User)
-	return c.userRepo.DeleteRefreshToken(user)
+	return u.userRepo.DeleteRefreshToken(user)
 }

@@ -33,7 +33,7 @@ func genAuthResponseFromToken(token *usecase.TokenResponse) *gen.AuthenticateRes
 	}
 }
 
-func (c *AuthService) setRefreshTokenCookie(ctx context.Context, token string, expiration uint64) {
+func (s *AuthService) setRefreshTokenCookie(ctx context.Context, token string, expiration uint64) {
 	md := metadata.Pairs(
 		"Set-Cookie", fmt.Sprintf("refresh_token=%s; HttpOnly; SameSite=Strict; Path=/api; Max-Age=%d",
 			token,
@@ -48,7 +48,7 @@ func (c *AuthService) setRefreshTokenCookie(ctx context.Context, token string, e
 
 }
 
-func (c *AuthService) deleteRefreshTokenCookie(ctx context.Context) {
+func (s *AuthService) deleteRefreshTokenCookie(ctx context.Context) {
 	md := metadata.Pairs(
 		"Set-Cookie", fmt.Sprintf("refresh_token=\"\"; HttpOnly; SameSite=Strict; Path=/api; Max-Age=0"),
 		"Cache-Control", "no-store",

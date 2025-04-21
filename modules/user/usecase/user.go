@@ -75,7 +75,7 @@ type UserUpdateInput struct {
 	Password *string `json:"password" example:"newsecurepassword"`
 }
 
-func (c *UserUsecase) UpdateUser(ctx context.Context, input *UserUpdateInput) (*models.User, error) {
+func (u *UserUsecase) UpdateUser(ctx context.Context, input *UserUpdateInput) (*models.User, error) {
 	user := ctx.Value("user").(*models.User)
 
 	if input.Name != nil {
@@ -96,7 +96,7 @@ func (c *UserUsecase) UpdateUser(ctx context.Context, input *UserUpdateInput) (*
 		return nil, roshan_errors.ErrInvalidRequest
 	}
 
-	if err := c.userRepo.SaveUser(user); err != nil {
+	if err := u.userRepo.SaveUser(user); err != nil {
 		if helpers.IsErrorCode(err, "23505") {
 			return nil, ErrEmailAlreadyExists
 		}
@@ -106,17 +106,17 @@ func (c *UserUsecase) UpdateUser(ctx context.Context, input *UserUpdateInput) (*
 	return user, nil
 }
 
-func (c *UserUsecase) DeleteUser(ctx context.Context) (*models.User, error) {
+func (u *UserUsecase) DeleteUser(ctx context.Context) (*models.User, error) {
 	user := ctx.Value("user").(*models.User)
 
-	if err := c.userRepo.DeleteUser(user); err != nil {
+	if err := u.userRepo.DeleteUser(user); err != nil {
 		return nil, ErrUserNotFound
 	}
 
 	return user, nil
 }
 
-func (c *UserUsecase) GetUser(ctx context.Context) (*models.User, error) {
+func (u *UserUsecase) GetUser(ctx context.Context) (*models.User, error) {
 	user := ctx.Value("user").(*models.User)
 	return user, nil
 }

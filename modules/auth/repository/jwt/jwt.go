@@ -40,12 +40,12 @@ type CustomClaims struct {
 	jwt.RegisteredClaims
 }
 
-func (c *JWTRepository) GetRefreshTokenKeyFunc(token *jwt.Token) (any, error) {
-	return c.refreshSecretKey, nil
+func (r *JWTRepository) GetRefreshTokenKeyFunc(token *jwt.Token) (any, error) {
+	return r.refreshSecretKey, nil
 }
 
-func (c *JWTRepository) GetTokenKeyFunc(token *jwt.Token) (any, error) {
-	return c.secretKey, nil
+func (r *JWTRepository) GetTokenKeyFunc(token *jwt.Token) (any, error) {
+	return r.secretKey, nil
 }
 
 type TokenData struct {
@@ -57,30 +57,30 @@ type TokenData struct {
 	Scope            string `json:"scope"`
 }
 
-func (s *JWTRepository) GenerateAccessAndRefreshTokens(user *models.User) (*TokenData, error) {
+func (r *JWTRepository) GenerateAccessAndRefreshTokens(user *models.User) (*TokenData, error) {
 	now := time.Now()
 
-	accessToken, err := s.generateToken(user, ACCESS_TOKEN, now)
+	accessToken, err := r.generateToken(user, ACCESS_TOKEN, now)
 	if err != nil {
 		return nil, err
 	}
 
-	refreshToken, err := s.generateToken(user, REFRESH_TOKEN, now)
+	refreshToken, err := r.generateToken(user, REFRESH_TOKEN, now)
 	if err != nil {
 		return nil, err
 	}
 
 	return &TokenData{
 		AccessToken:      accessToken,
-		ExpiresIn:        uint64(s.tokenDuration.Seconds()),
+		ExpiresIn:        uint64(r.tokenDuration.Seconds()),
 		RefreshToken:     refreshToken,
-		RefreshExpiresIn: uint64((s.refreshTokenDuration).Seconds()),
+		RefreshExpiresIn: uint64((r.refreshTokenDuration).Seconds()),
 		TokenType:        "Bearer",
 		Scope:            "email",
 	}, nil
 }
 
-func (s *JWTRepository) generateToken(user *models.User, tokenType TokenType, now time.Time) (string, error) {
+func (r *JWTRepository) generateToken(user *models.User, tokenType TokenType, now time.Time) (string, error) {
 	uuid := helpers.GenUUID()
 
 	var duration time.Duration
@@ -88,11 +88,11 @@ func (s *JWTRepository) generateToken(user *models.User, tokenType TokenType, no
 
 	switch tokenType {
 	case ACCESS_TOKEN:
-		duration = s.tokenDuration
-		signingKey = s.secretKey
+		duration = r.tokenDuration
+		signingKey = r.secretKey
 	case REFRESH_TOKEN:
-		duration = s.refreshTokenDuration
-		signingKey = s.refreshSecretKey
+		duration = r.refreshTokenDuration
+		signingKey = r.refreshSecretKey
 	}
 
 	claims := CustomClaims{
@@ -112,20 +112,20 @@ func (s *JWTRepository) generateToken(user *models.User, tokenType TokenType, no
 	return token.SignedString(signingKey)
 }
 
-func (s *JWTRepository) ValidateToken(tokenString string, expectedKind TokenType) (*jwt.Token, *CustomClaims, error) {
+func (r *JWTRepository) ValidateToken(tokenString string, expectedKind TokenType) (*jwt.Token, *CustomClaims, error) {
 	claims := &CustomClaims{}
 
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
 		switch expectedKind {
 		case ACCESS_TOKEN:
-			return s.secretKey, nil
+			return r.secretKey, nil
 		case REFRESH_TOKEN:
-			return s.refreshSecretKey, nil
+			return r.refreshSecretKey, nil
 		default:
 			panic("invalid token kind")
 		}
 	}, jwt.WithValidMethods([]string{"HS256"}),
-		jwt.WithIssuer(s.issuer),
+		jwt.WithIssuer(r.issuer),
 		jwt.WithExpirationRequired())
 	if err != nil {
 		return nil, nil, err

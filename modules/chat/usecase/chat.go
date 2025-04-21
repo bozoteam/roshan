@@ -68,10 +68,10 @@ var (
 	ErrUserNotCreator     = status.Error(codes.PermissionDenied, "user cannot delete room, not creator")
 )
 
-func (cc *ChatUsecase) SendMessage(ctx context.Context, content string, roomId string) error {
+func (u *ChatUsecase) SendMessage(ctx context.Context, content string, roomId string) error {
 	user := ctx.Value("user").(*userModel.User)
 
-	room := cc.hub.GetRoom(roomId)
+	room := u.hub.GetRoom(roomId)
 	if room == nil {
 		return ErrRoomNotFound
 	}
@@ -98,11 +98,11 @@ func (cc *ChatUsecase) SendMessage(ctx context.Context, content string, roomId s
 	}
 
 	// Broadcast the message
-	cc.hub.BroadcastMessage(message)
+	u.hub.BroadcastMessage(message)
 	return nil
 }
 
-func (cc *ChatUsecase) CreateRoom(ctx context.Context, name string) (string, error) {
+func (u *ChatUsecase) CreateRoom(ctx context.Context, name string) (string, error) {
 	user := ctx.Value("user").(*userModel.User)
 
 	uuid := helpers.GenUUID()
@@ -114,13 +114,13 @@ func (cc *ChatUsecase) CreateRoom(ctx context.Context, name string) (string, err
 		Clients:   make(map[string]*models.Client),
 	}
 
-	cc.hub.CreateRoom(room)
+	u.hub.CreateRoom(room)
 
 	return uuid, nil
 }
 
-func (cc *ChatUsecase) ListRooms(ctx context.Context) ([]*RoomResponse, error) {
-	rooms := cc.hub.ListRooms()
+func (u *ChatUsecase) ListRooms(ctx context.Context) ([]*RoomResponse, error) {
+	rooms := u.hub.ListRooms()
 
 	responseRooms := make([]*RoomResponse, 0, len(rooms))
 	for _, room := range rooms {
@@ -142,10 +142,10 @@ func (cc *ChatUsecase) ListRooms(ctx context.Context) ([]*RoomResponse, error) {
 	return responseRooms, nil
 }
 
-func (cc *ChatUsecase) DeleteRoom(ctx context.Context, roomId string) (*RoomResponse, error) {
+func (u *ChatUsecase) DeleteRoom(ctx context.Context, roomId string) (*RoomResponse, error) {
 	user := ctx.Value("user").(*userModel.User)
 
-	room := cc.hub.GetRoom(roomId)
+	room := u.hub.GetRoom(roomId)
 	if room == nil {
 		return nil, ErrRoomNotFound
 	}
@@ -159,7 +159,7 @@ func (cc *ChatUsecase) DeleteRoom(ctx context.Context, roomId string) (*RoomResp
 		users = append(users, user.User)
 	}
 
-	cc.hub.DeleteRoom(roomId)
+	u.hub.DeleteRoom(roomId)
 
 	return &RoomResponse{
 		Id:        room.ID,
@@ -169,36 +169,36 @@ func (cc *ChatUsecase) DeleteRoom(ctx context.Context, roomId string) (*RoomResp
 	}, nil
 }
 
-func (cc *ChatUsecase) HandleWebSocket(ctx *gin.Context) {
+func (u *ChatUsecase) HandleWebSocket(ctx *gin.Context) {
 	roomID := ctx.Param("id")
 	token, ok := ctx.GetQuery("token")
 	if !ok {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Token is required"})
 		return
 	}
-	_, claims, err := cc.jwtRepository.ValidateToken(token, jwtRepository.ACCESS_TOKEN)
+	_, claims, err := u.jwtRepository.ValidateToken(token, jwtRepository.ACCESS_TOKEN)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 		return
 	}
-	user, err := cc.userRepository.FindUserById(claims.Subject)
+	user, err := u.userRepository.FindUserById(claims.Subject)
 	if err != nil {
 		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
 		return
 	}
 
-	room := cc.hub.GetRoom(roomID)
+	room := u.hub.GetRoom(roomID)
 	if room == nil {
 		ctx.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
 		return
 	}
 
 	// Allow all origins for the WebSocket upgrade
-	cc.upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	u.upgrader.CheckOrigin = func(r *http.Request) bool { return true }
 
-	conn, err := cc.upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
+	conn, err := u.upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
-		cc.logger.Error("Failed to upgrade connection", "error", err)
+		u.logger.Error("Failed to upgrade connection", "error", err)
 		return
 	}
 
@@ -209,17 +209,17 @@ func (cc *ChatUsecase) HandleWebSocket(ctx *gin.Context) {
 	client := models.NewClient(user, conn, roomID, unregister)
 
 	// Start goroutines for reading and writing
-	go client.ReadPump(cc.hub)
-	go client.WritePump(cc.hub)
+	go client.ReadPump(u.hub)
+	go client.WritePump(u.hub)
 
 	// Register client to room
-	cc.hub.Register(client, roomID)
+	u.hub.Register(client, roomID)
 
-	cc.logger.Info("User connected to room", "user_id", user.Id, "room_id", roomID)
+	u.logger.Info("User connected to room", "user_id", user.Id, "room_id", roomID)
 
 	// Handle unregistration when the client disconnects
 	// This runs in the same goroutine as HandleWebSocket
 	clientToUnregister := <-unregister
-	cc.hub.Unregister(clientToUnregister, roomID)
-	cc.logger.Info("User disconnected from room", "user_id", user.Id, "room_id", roomID)
+	u.hub.Unregister(clientToUnregister, roomID)
+	u.logger.Info("User disconnected from room", "user_id", user.Id, "room_id", roomID)
 }
