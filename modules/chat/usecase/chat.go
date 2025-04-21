@@ -124,16 +124,16 @@ func (u *ChatUsecase) ListRooms(ctx context.Context) ([]*RoomResponse, error) {
 
 	responseRooms := make([]*RoomResponse, 0, len(rooms))
 	for _, room := range rooms {
-		clients := make([]*userModel.User, 0, len(room.Clients))
+		users := make([]*userModel.User, 0, len(room.Clients))
 		for _, client := range room.Clients {
-			clients = append(clients, client.User)
+			users = append(users, client.User)
 		}
 
 		responseRoom := &RoomResponse{
 			CreatorId: room.CreatorID,
 			Id:        room.ID,
 			Name:      room.Name,
-			Users:     clients,
+			Users:     users,
 		}
 
 		responseRooms = append(responseRooms, responseRoom)

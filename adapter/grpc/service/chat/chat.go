@@ -53,7 +53,7 @@ func (s *ChatService) ListRooms(ctx context.Context, req *gen.ListRoomsRequest) 
 	outRooms := make([]*gen.Room, 0, len(rooms))
 	for _, room := range rooms {
 		users := make([]*userGen.User, 0, len(room.Users))
-		for _, user := range users {
+		for _, user := range room.Users {
 			users = append(users, &userGen.User{
 				Name:  user.Name,
 				Id:    user.Id,
