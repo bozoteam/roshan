@@ -7,10 +7,11 @@ import (
 	"time"
 )
 
-func (h *Hub) handleRegister(reg *ClientRegistration) {
+func (h *Hub) handleRegister(reg *clientRegistration) {
 	fmt.Printf("Registration request for room: %s, client: %s\n", reg.RoomID, reg.Client.User.Id)
 	room, exists := h.rooms[reg.RoomID]
 	if !exists {
+		reg.result <- nil
 		return
 	}
 	// Add client to room
@@ -27,46 +28,56 @@ func (h *Hub) handleRegister(reg *ClientRegistration) {
 
 	// Send current user list after a client joins
 	h.sendUserList(room)
+
+	reg.result <- reg.Client
 }
 
-func (h *Hub) handleUnregister(unreg *ClientUnregistration) {
+func (h *Hub) handleUnregister(unreg *clientUnregistration) {
 	fmt.Printf("Unregistration request for client: %s, room: %s\n", unreg.Client.Id, unreg.RoomID)
 	// If specific room provided
-	if unreg.RoomID != "" {
-		if room, ok := h.rooms[unreg.RoomID]; ok {
-			if _, ok := room.Clients[unreg.Client.Id]; ok {
-				delete(room.Clients, unreg.Client.Id)
-				close(unreg.Client.Send)
-				// Send updated user list after a client leaves
-				h.sendUserList(room)
+	if room, ok := h.rooms[unreg.RoomID]; ok {
+		if _, ok := room.Clients[unreg.Client.Id]; ok {
+			delete(room.Clients, unreg.Client.Id)
+			close(unreg.Client.Send)
+			// Send updated user list after a client leaves
+			h.sendUserList(room)
 
-				if len(room.Clients) == 0 {
-					// If no clients left in the room, delete the room
-					fmt.Printf("Deleting empty room: %s\n", unreg.RoomID)
-					h.deleteRoom <- unreg.RoomID
-				}
+			if len(room.Clients) == 0 {
+				// If no clients left in the room, delete the room
+				fmt.Printf("Deleting empty room: %s\n", unreg.RoomID)
+				h.DeleteRoom(room.ID)
 			}
 		}
 	}
+
+	unreg.result <- unreg.Client
+
 }
 
-func (h *Hub) handleCreateRoom(room *Room) {
+func (h *Hub) handleCreateRoom(create *createRoom) {
+	room := create.Room
 	fmt.Printf("Creating room: %s, name: %s\n", room.ID, room.Name)
 	h.rooms[room.ID] = room
 	room.emptyTimer = time.AfterFunc(time.Second*10, func() {
 		fmt.Printf("Deleting empty room: %s\n", room.ID)
-		h.deleteRoom <- room.ID
+		h.DeleteRoom(room.ID)
 	})
+
+	create.result <- room
 }
 
-func (h *Hub) handleDeleteRoom(roomID string) {
-	fmt.Printf("Deleting room: %s\n", roomID)
-	if _, ok := h.rooms[roomID]; ok {
-		delete(h.rooms, roomID)
+func (h *Hub) handleDeleteRoom(deleteRoom *deleteRoom) {
+	fmt.Printf("Deleting room: %s\n", deleteRoom.roomId)
+	room, ok := h.rooms[deleteRoom.roomId]
+	if ok {
+		delete(h.rooms, room.ID)
 	}
+
+	deleteRoom.result <- room
 }
 
-func (h *Hub) handleMessage(msg *Message) {
+func (h *Hub) handleMessage(send *sendMessage) {
+	msg := send.Msg
 	fmt.Printf("Broadcasting message to room: %s, from: %s\n", msg.RoomID, msg.User.Email)
 	if room, ok := h.rooms[msg.RoomID]; ok {
 		// Serialize the message once
@@ -87,6 +98,8 @@ func (h *Hub) handleMessage(msg *Message) {
 			}
 		}
 	}
+
+	send.result <- msg
 }
 
 func (h *Hub) handleEvent(event *Event) {

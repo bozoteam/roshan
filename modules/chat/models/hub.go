@@ -33,8 +33,6 @@ type Client struct {
 	PingNotify chan struct{}   `json:"-"`
 }
 
-
-
 // Room represents a chat room
 type Room struct {
 	ID         string
@@ -45,43 +43,20 @@ type Room struct {
 	emptyTimer *time.Timer
 }
 
-// ClientRegistration holds data for registering a client to a room
-type ClientRegistration struct {
-	Client *Client
-	RoomID string
-}
-
-// ClientUnregistration holds data for unregistering a client
-type ClientUnregistration struct {
-	Client *Client
-	RoomID string
-}
-
-// roomRequest is used to safely get room data
-type roomRequest struct {
-	id     string
-	result chan *Room
-}
-
-// roomsRequest is used to get a list of all rooms
-type roomsRequest struct {
-	result chan []*Room
-}
-
 // Hub manages all rooms and connections
 type Hub struct {
 	// Rooms indexed by ID
 	rooms map[string]*Room
 
 	// Channels for operations
-	register         chan *ClientRegistration
-	unregister       chan *ClientUnregistration
-	broadcastMessage chan *Message
+	register         chan *clientRegistration
+	unregister       chan *clientUnregistration
+	broadcastMessage chan *sendMessage
 	broadcastEvent   chan *Event
-	createRoom       chan *Room
-	deleteRoom       chan string
-	getRoom          chan roomRequest
-	listRooms        chan roomsRequest
+	createRoom       chan *createRoom
+	deleteRoom       chan *deleteRoom
+	getRoom          chan *roomRequest
+	listRooms        chan *roomsRequest
 }
 
 // NewClient creates a new client
@@ -101,16 +76,16 @@ func NewHub() *Hub {
 	return &Hub{
 		rooms: make(map[string]*Room),
 
-		register:   make(chan *ClientRegistration, 1),
-		unregister: make(chan *ClientUnregistration, 1),
+		register:   make(chan *clientRegistration, 1),
+		unregister: make(chan *clientUnregistration, 1),
 
-		broadcastMessage: make(chan *Message, 1),
+		broadcastMessage: make(chan *sendMessage, 1),
 		broadcastEvent:   make(chan *Event, 1),
 
-		createRoom: make(chan *Room, 1),
-		deleteRoom: make(chan string, 1),
-		getRoom:    make(chan roomRequest, 1),
-		listRooms:  make(chan roomsRequest, 1),
+		createRoom: make(chan *createRoom, 1),
+		deleteRoom: make(chan *deleteRoom, 1),
+		getRoom:    make(chan *roomRequest, 1),
+		listRooms:  make(chan *roomsRequest, 1),
 	}
 }
 
@@ -123,11 +98,10 @@ func (h *Hub) Run() {
 			h.handleRegister(reg)
 
 		case unreg := <-h.unregister:
-			fmt.Println(unreg)
 			h.handleUnregister(unreg)
 
-		case room := <-h.createRoom:
-			h.handleCreateRoom(room)
+		case create := <-h.createRoom:
+			h.handleCreateRoom(create)
 
 		case roomID := <-h.deleteRoom:
 			h.handleDeleteRoom(roomID)
@@ -139,10 +113,10 @@ func (h *Hub) Run() {
 			h.handleEvent(event)
 
 		case req := <-h.getRoom:
-			h.handleGetRoom(&req)
+			h.handleGetRoom(req)
 
 		case req := <-h.listRooms:
-			h.handleListRooms(&req)
+			h.handleListRooms(req)
 		}
 	}
 }
