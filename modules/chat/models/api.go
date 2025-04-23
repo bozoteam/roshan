@@ -1,5 +1,7 @@
 package models
 
+import "fmt"
+
 // Register adds a client to a room
 func (h *Hub) Register(client *Client, roomID string) *Client {
 	result := make(chan *Client, 1)
@@ -46,6 +48,7 @@ func (h *Hub) DeleteRoom(roomID string) *Room {
 		result: result,
 	}
 
+	fmt.Println("==========Deleting room:", roomID)
 	return <-result
 }
 

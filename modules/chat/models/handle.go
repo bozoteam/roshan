@@ -45,13 +45,15 @@ func (h *Hub) handleUnregister(unreg *clientUnregistration) {
 			if len(room.Clients) == 0 {
 				// If no clients left in the room, delete the room
 				fmt.Printf("Deleting empty room: %s\n", unreg.RoomID)
-				h.DeleteRoom(room.ID)
+				h.handleDeleteRoom(&deleteRoom{
+					roomId: unreg.RoomID,
+					result: make(chan *Room, 1),
+				})
 			}
 		}
 	}
 
 	unreg.result <- unreg.Client
-
 }
 
 func (h *Hub) handleCreateRoom(create *createRoom) {
@@ -60,7 +62,10 @@ func (h *Hub) handleCreateRoom(create *createRoom) {
 	h.rooms[room.ID] = room
 	room.emptyTimer = time.AfterFunc(time.Second*10, func() {
 		fmt.Printf("Deleting empty room: %s\n", room.ID)
-		h.DeleteRoom(room.ID)
+		h.handleDeleteRoom(&deleteRoom{
+			roomId: room.ID,
+			result: make(chan *Room, 1),
+		})
 	})
 
 	create.result <- room

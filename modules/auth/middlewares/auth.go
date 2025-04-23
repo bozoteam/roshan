@@ -31,11 +31,13 @@ func (m *AuthMiddleware) UnaryInterceptor(ctx context.Context, req any, info *gr
 
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
+		m.logger.Error("missing metadata")
 		return nil, roshan_errors.ErrMissingToken
 	}
 
 	authorization, ok := md["authorization"]
 	if !ok {
+		m.logger.Error("missing authorization header")
 		return nil, roshan_errors.ErrMissingToken
 	}
 

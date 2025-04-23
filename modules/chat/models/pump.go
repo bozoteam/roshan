@@ -75,6 +75,7 @@ func (c *Client) writeMessage(message []byte, ok bool) error {
 func (c *Client) WritePump(hub *Hub) {
 	ticker := time.NewTicker(time.Second * 2)
 	defer func() {
+		fmt.Println("Closing WritePump")
 		ticker.Stop()
 		c.Conn.Close()
 	}()
