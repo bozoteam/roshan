@@ -76,16 +76,16 @@ func NewHub() *Hub {
 	return &Hub{
 		rooms: make(map[string]*Room),
 
-		register:   make(chan *clientRegistration, 1),
-		unregister: make(chan *clientUnregistration, 1),
+		register:   make(chan *clientRegistration),
+		unregister: make(chan *clientUnregistration),
 
-		broadcastMessage: make(chan *sendMessage, 1),
-		broadcastEvent:   make(chan *Event, 1),
+		broadcastMessage: make(chan *sendMessage),
+		broadcastEvent:   make(chan *Event),
 
-		createRoom: make(chan *createRoom, 1),
-		deleteRoom: make(chan *deleteRoom, 1),
-		getRoom:    make(chan *roomRequest, 1),
-		listRooms:  make(chan *roomsRequest, 1),
+		createRoom: make(chan *createRoom),
+		deleteRoom: make(chan *deleteRoom),
+		getRoom:    make(chan *roomRequest),
+		listRooms:  make(chan *roomsRequest),
 	}
 }
 
@@ -135,8 +135,8 @@ func (h *Hub) sendUserList(room *Room) {
 	event := &Event{
 		RoomID:    room.ID,
 		Users:     users,
-		Timestamp: time.Now().Unix(),
+		Timestamp: time.Now().UnixNano(),
 	}
 
-	h.broadcastEvent <- event
+	h.handleEvent(event)
 }

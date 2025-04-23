@@ -94,7 +94,7 @@ func (u *ChatUsecase) SendMessage(ctx context.Context, content string, roomId st
 		RoomID:    roomId,
 		User:      user,
 		Content:   content,
-		Timestamp: time.Now().Unix(),
+		Timestamp: time.Now().UnixNano(),
 	}
 
 	// Broadcast the message

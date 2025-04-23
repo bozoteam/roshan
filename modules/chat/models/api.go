@@ -4,7 +4,7 @@ import "fmt"
 
 // Register adds a client to a room
 func (h *Hub) Register(client *Client, roomID string) *Client {
-	result := make(chan *Client, 1)
+	result := make(chan *Client)
 	h.register <- &clientRegistration{
 		Client: client,
 		RoomID: roomID,
@@ -17,7 +17,7 @@ func (h *Hub) Register(client *Client, roomID string) *Client {
 
 // Unregister removes a client from a room
 func (h *Hub) Unregister(client *Client, roomID string) *Client {
-	result := make(chan *Client, 1)
+	result := make(chan *Client)
 	h.unregister <- &clientUnregistration{
 		Client: client,
 		RoomID: roomID,
@@ -30,7 +30,7 @@ func (h *Hub) Unregister(client *Client, roomID string) *Client {
 
 // CreateRoom adds a new room to the hub
 func (h *Hub) CreateRoom(room *Room) *Room {
-	result := make(chan *Room, 1)
+	result := make(chan *Room)
 	h.createRoom <- &createRoom{
 		Room: room,
 
@@ -41,7 +41,7 @@ func (h *Hub) CreateRoom(room *Room) *Room {
 
 // DeleteRoom removes a room from the hub
 func (h *Hub) DeleteRoom(roomID string) *Room {
-	result := make(chan *Room, 1)
+	result := make(chan *Room)
 	h.deleteRoom <- &deleteRoom{
 		roomId: roomID,
 
@@ -54,7 +54,7 @@ func (h *Hub) DeleteRoom(roomID string) *Room {
 
 // BroadcastMessage sends a message to all clients in a room
 func (h *Hub) BroadcastMessage(msg *Message) *Message {
-	result := make(chan *Message, 1)
+	result := make(chan *Message)
 	h.broadcastMessage <- &sendMessage{
 		Msg: msg,
 
@@ -71,14 +71,14 @@ func (h *Hub) BroadcastEvent(event *Event) {
 
 // GetRoom returns a room by ID
 func (h *Hub) GetRoom(id string) *Room {
-	result := make(chan *Room, 1)
+	result := make(chan *Room)
 	h.getRoom <- &roomRequest{id: id, result: result}
 	return <-result
 }
 
 // ListRooms returns a list of all rooms
 func (h *Hub) ListRooms() []*Room {
-	result := make(chan []*Room, 1)
+	result := make(chan []*Room)
 	h.listRooms <- &roomsRequest{result: result}
 	return <-result
 }

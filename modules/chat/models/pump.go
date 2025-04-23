@@ -73,7 +73,7 @@ func (c *Client) writeMessage(message []byte, ok bool) error {
 
 // WritePump handles sending messages to a client
 func (c *Client) WritePump(hub *Hub) {
-	ticker := time.NewTicker(time.Second * 2)
+	ticker := time.NewTicker(time.Second * 10)
 	defer func() {
 		fmt.Println("Closing WritePump")
 		ticker.Stop()
