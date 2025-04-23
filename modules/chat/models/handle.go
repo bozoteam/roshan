@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
+	"slices"
 	"time"
 )
 
@@ -137,19 +138,5 @@ func (h *Hub) handleGetRoom(req *roomRequest) {
 
 func (h *Hub) handleListRooms(req *roomsRequest) {
 	fmt.Println("List rooms request received")
-	// Create a copy of the rooms to avoid data races
-	rooms := make([]*Room, 0, len(h.rooms))
-	for _, room := range h.rooms {
-		// Create a copy of the room
-		roomCopy := &Room{
-			ID:        room.ID,
-			Name:      room.Name,
-			CreatorID: room.CreatorID,
-			Clients:   make(map[string]*Client),
-		}
-		// Copy clients
-		maps.Copy(roomCopy.Clients, room.Clients)
-		rooms = append(rooms, roomCopy)
-	}
-	req.result <- rooms
+	req.result <- slices.Collect(maps.Values(h.rooms))
 }

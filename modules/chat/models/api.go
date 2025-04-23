@@ -1,7 +1,5 @@
 package models
 
-import "fmt"
-
 // Register adds a client to a room
 func (h *Hub) Register(client *Client, roomID string) *Client {
 	result := make(chan *Client)
@@ -36,19 +34,19 @@ func (h *Hub) CreateRoom(room *Room) *Room {
 
 		result: result,
 	}
+
 	return <-result
 }
 
 // DeleteRoom removes a room from the hub
-func (h *Hub) DeleteRoom(roomID string) *Room {
+func (h *Hub) DeleteRoom(room *Room) *Room {
 	result := make(chan *Room)
 	h.deleteRoom <- &deleteRoom{
-		roomId: roomID,
+		roomId: room.ID,
 
 		result: result,
 	}
 
-	fmt.Println("==========Deleting room:", roomID)
 	return <-result
 }
 
@@ -72,13 +70,20 @@ func (h *Hub) BroadcastEvent(event *Event) {
 // GetRoom returns a room by ID
 func (h *Hub) GetRoom(id string) *Room {
 	result := make(chan *Room)
-	h.getRoom <- &roomRequest{id: id, result: result}
+	h.getRoom <- &roomRequest{
+		id:     id,
+		result: result,
+	}
+
 	return <-result
 }
 
 // ListRooms returns a list of all rooms
 func (h *Hub) ListRooms() []*Room {
 	result := make(chan []*Room)
-	h.listRooms <- &roomsRequest{result: result}
+	h.listRooms <- &roomsRequest{
+		result: result,
+	}
+
 	return <-result
 }

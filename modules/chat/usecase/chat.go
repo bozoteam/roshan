@@ -159,7 +159,7 @@ func (u *ChatUsecase) DeleteRoom(ctx context.Context, roomId string) (*RoomRespo
 		users = append(users, user.User)
 	}
 
-	u.hub.DeleteRoom(roomId)
+	u.hub.DeleteRoom(room)
 
 	return &RoomResponse{
 		Id:        room.ID,
