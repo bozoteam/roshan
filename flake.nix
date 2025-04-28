@@ -21,9 +21,11 @@
         ship = pkgs.mkShell {
           packages = [
             pkgs.openssh
+            pkgs.coreutils
           ];
           shellHook =
             let
+              cat = "${pkgs.coreutils}/bin/cat";
               sshCommand = "${pkgs.openssh}/bin/ssh -i ~/.ssh/proxyaccess.pem ec2-user@bozo.mateusbento.com";
             in
             ''
@@ -33,11 +35,11 @@
 
               ${sshCommand} 'cd /bozo && docker-compose down roshan'
 
-              cat result-atlas  | ${sshCommand} 'docker rmi atlas  -f ; docker load'
+              ${cat} result-atlas  | ${sshCommand} 'docker rmi atlas  -f ; docker load'
 
               ${sshCommand} 'cd /bozo && docker run --network=bozo_backend atlas'
 
-              cat result-roshan | ${sshCommand} 'docker rmi roshan -f ; docker load'
+              ${cat} result-roshan | ${sshCommand} 'docker rmi roshan -f ; docker load'
 
               ${sshCommand} 'cd /bozo && docker-compose up --build -d'
 
