@@ -1,114 +1,118 @@
 {
-  description = "Application with Go, Atlas, and PostgreSQL";
-
+  description = "Docker image for Go app and Node.js app";
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
-
   outputs =
     {
       self,
       nixpkgs,
       flake-utils,
+      ...
     }:
+
     flake-utils.lib.eachDefaultSystem (
       system:
       let
-        pkgs = import nixpkgs { inherit system; };
-        # Main run script that starts everything
-        runScript = pkgs.writeScriptBin "run-app" ''
-          #!${pkgs.fish}/bin/fish
+        pkgs = nixpkgs.legacyPackages.${system};
 
-          # Setup cleanup function
-          function cleanup
-            echo "Cleaning up..."
-            ${pkgs.postgresql}/bin/pg_ctl -D $PGDATA stop
-            pkill -P (echo %self)
-            exit 0
-          end
+        ship = pkgs.mkShell {
+          packages = [
+            pkgs.openssh
+          ];
+          shellHook =
+            let
+              sshCommand = "${pkgs.openssh}/bin/ssh -i ~/.ssh/proxyaccess.pem ec2-user@bozo.mateusbento.com";
+            in
+            ''
+              set -ex -o pipefail
+              nix build .#packages.x86_64-linux.roshanDocker --out-link result-roshan
+              nix build .#packages.x86_64-linux.atlasDocker --out-link result-atlas
 
-          # Setup trap for cleanup
-          trap cleanup SIGINT SIGTERM
+              ${sshCommand} 'cd /bozo && docker-compose down roshan'
 
-          # Setup PostgreSQL
-          set -x PGDATA "$PWD/postgres_data"
+              cat result-atlas  | ${sshCommand} 'docker rmi atlas  -f ; docker load'
 
-          # Initialize PostgreSQL if needed
-          if test ! -d "$PGDATA"
-            echo "Initializing PostgreSQL database..."
-            mkdir -p "$PGDATA"
+              ${sshCommand} 'cd /bozo && docker run --network=bozo_backend atlas'
 
-          # Initialize with explicit postgres superuser
-          ${pkgs.postgresql}/bin/initdb -D "$PGDATA" \
-            --username=postgres \
-            --auth=trust \
-            --no-locale \
-            --encoding=UTF8
+              cat result-roshan | ${sshCommand} 'docker rmi roshan -f ; docker load'
 
-            # Configure PostgreSQL
-            echo "listen_addresses = '127.0.0.1'" >> "$PGDATA/postgresql.conf"
-            echo "port = 5432" >> "$PGDATA/postgresql.conf"
-            
-            # Set up authentication
-            echo "local all all trust" > "$PGDATA/pg_hba.conf"
-            echo "host all all 127.0.0.1/32 trust" >> "$PGDATA/pg_hba.conf"
-            echo "host all all ::1/128 trust" >> "$PGDATA/pg_hba.conf"
-            
-            # Start PostgreSQL
-            ${pkgs.postgresql}/bin/pg_ctl -D "$PGDATA" -l "$PGDATA/logfile" start
+              ${sshCommand} 'cd /bozo && docker-compose up --build -d'
 
-          else
-            # Just start the server
-            ${pkgs.postgresql}/bin/pg_ctl -D "$PGDATA" -l "$PGDATA/logfile" start
-          end
-
-          # Wait for PostgreSQL to be ready
-          echo "Waiting for PostgreSQL to be ready..."
-          while true
-            ${pkgs.postgresql}/bin/pg_isready -U postgres -h 127.0.0.1
-            if test $status -eq 0
-              echo "PostgreSQL is ready!"
-              break
-            end
-            sleep 1
-          end
-
-          # Create user
-          ${pkgs.postgresql}/bin/createuser roshan -d -h localhost -U postgres
-          # Create database
-          ${pkgs.postgresql}/bin/createdb roshan -O roshan -U roshan
-
-          # Run migrations and schema updates
-          ${pkgs.atlas}/bin/atlas migrate diff $argv --env postgres --config "file://db/atlas.hcl"; or begin; cleanup; exit 1; end
-          ${pkgs.atlas}/bin/atlas migrate apply --env postgres --config file://db/atlas.hcl; or begin; cleanup; exit 1; end
-
-          # Run the Go application
-          echo "Starting application..."
-          cd $PWD && ${pkgs.go}/bin/go run ./cmd/server/main.go; or begin; cleanup; exit 1; end
-        '';
-
-      in
-      {
-        packages = {
-          run-app = runScript;
-          default = runScript;
+              echo SUCCESS
+              exit 0
+            '';
         };
 
-        devShell = pkgs.mkShell {
-          buildInputs = [
-            pkgs.go
-            pkgs.atlas
-            pkgs.postgresql
-            pkgs.fish
-            runScript
-          ];
+        roshanApp = pkgs.buildGoModule {
+          pname = "roshan";
+          version = "0.1.0";
+          src = ./.;
+          subPackages = [ "cmd/server" ];
+          vendorHash = "sha256-oZf1IpHyQBMtETIc6J6WJu1XwzLk28HHMBm9QNvQ0/g=";
+        };
+        # More minimal Docker image using a stripped binary
+        roshanDockerImage = pkgs.dockerTools.buildLayeredImage {
+          name = "roshan";
+          tag = "latest";
+          contents = [ roshanApp ];
+          config = {
+            Cmd = [ "${roshanApp}/bin/server" ];
+            ExposedPorts = {
+              "8080/tcp" = { };
+            };
+          };
+        };
 
-          shellHook = ''
-            echo "Development environment ready!"
-            echo "Run 'run-app' to start the application with PostgreSQL"
-            echo "Or use individual commands: 'migrate', 'apply'"
-          '';
+        atlasDockerImage =
+          let
+            dbUrl = "postgres://roshan:roshan@postgres:5432/roshan?sslmode=disable";
+            migrationsDir = ./db/migrations;
+            atlasConfig = pkgs.writeText "atlas.hcl" ''
+              env "migrations" {
+                url = "${dbUrl}"
+                migration {
+                  dir = "file:///migrations"
+                  format = atlas
+                 }
+              }
+            '';
+          in
+          pkgs.dockerTools.buildLayeredImage {
+            name = "atlas";
+            tag = "latest";
+            contents = [
+              pkgs.atlas
+              pkgs.bash
+              pkgs.coreutils
+            ];
+            config = {
+              Cmd = [
+                "${pkgs.bash}/bin/bash"
+                "-c"
+                "${pkgs.atlas}/bin/atlas migrate apply --env migrations"
+              ];
+              Env = [
+                "DATABASE_URL=\"${dbUrl}\""
+              ];
+            };
+            extraCommands = ''
+              mkdir -p migrations
+              cp -r ${migrationsDir}/* migrations/
+              cp ${atlasConfig} atlas.hcl
+            '';
+          };
+      in
+      {
+        devShells = {
+          ship = ship;
+        };
+        packages = {
+          default = roshanDockerImage;
+          roshan = roshanApp;
+          roshanDocker = roshanDockerImage;
+          atlasDocker = atlasDockerImage;
         };
       }
     );
