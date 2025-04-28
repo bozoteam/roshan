@@ -105,7 +105,7 @@ func RunServer() {
 		chatUsecase.HandleWebSocket(ctx)
 	})
 
-	listener, err := net.Listen("tcp", "127.0.0.1:8080")
+	listener, err := net.Listen("tcp", "0.0.0.0:8080")
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
