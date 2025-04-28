@@ -1,0 +1,3 @@
+[submodule "adapter/grpc"]
+	path = adapter/grpc
+	url = https://github.com/bozoteam/proto.git
