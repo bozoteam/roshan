@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -27,9 +26,8 @@ import (
 	chatUsecase "github.com/bozoteam/roshan/modules/chat/usecase"
 	userRepository "github.com/bozoteam/roshan/modules/user/repository"
 	userUsecase "github.com/bozoteam/roshan/modules/user/usecase"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
@@ -80,29 +78,26 @@ func RunServer() {
 
 	ginRouter := gin.Default()
 
-	// Combine handlers
-	combinedHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Set CORS headers
-		w.Header().Set("Access-Control-Allow-Origin", helpers.GetEnv("CORS_ALLOWED_ORIGINS"))
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE")
-		w.Header().Set("Access-Control-Allow-Headers", "Origin, Content-Type, Accept, Authorization")
-
-		// Handle preflight requests
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
-		}
-
-		if strings.HasSuffix(r.URL.Path, "/ws") {
-			ginRouter.ServeHTTP(w, r)
-			return
-		}
-		handler.ServeHTTP(w, r)
-	})
+	if helpers.IsDevelopment {
+		// add cors middleware
+		ginRouter.Use(cors.New(cors.Config{
+			AllowOrigins:     []string{helpers.GetEnv("CORS_ALLOWED_ORIGINS")},
+			AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
+			AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+			AllowCredentials: true,
+		}))
+	}
 
 	ginRouter.GET("/api/v1/chat/rooms/:id/ws", func(ctx *gin.Context) {
 		chatUsecase.HandleWebSocket(ctx)
+	})
+
+	ginRouter.GET("/health", func(ctx *gin.Context) {
+		ctx.String(http.StatusOK, "OK")
+	})
+
+	ginRouter.NoRoute(func(ctx *gin.Context) {
+		handler.ServeHTTP(ctx.Writer, ctx.Request)
 	})
 
 	listener, err := net.Listen("tcp", "0.0.0.0:8080")
@@ -111,9 +106,9 @@ func RunServer() {
 		os.Exit(1)
 	}
 
-	err = http.Serve(listener, h2c.NewHandler(combinedHandler, &http2.Server{}))
-	if !errors.Is(err, http.ErrServerClosed) {
-		_, _ = fmt.Fprintln(os.Stderr, err)
+	err = ginRouter.RunListener(listener)
+	if err != nil {
+		fmt.Println("Error starting server:", err)
 		os.Exit(1)
 	}
 }
