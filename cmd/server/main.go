@@ -78,15 +78,14 @@ func RunServer() {
 
 	ginRouter := gin.Default()
 
-	if helpers.IsDevelopment {
-		// add cors middleware
-		ginRouter.Use(cors.New(cors.Config{
-			AllowOrigins:     []string{helpers.GetEnv("CORS_ALLOWED_ORIGINS")},
-			AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
-			AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
-			AllowCredentials: true,
-		}))
-	}
+	// add cors middleware
+	ginRouter.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:50000", "http://127.0.0.1:50000"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+		AllowCredentials: true,
+	}))
+	// }
 
 	ginRouter.GET("/api/v1/chat/rooms/:id/ws", func(ctx *gin.Context) {
 		chatUsecase.HandleWebSocket(ctx)
