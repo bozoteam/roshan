@@ -81,7 +81,15 @@ func RunServer() {
 
 	// add cors middleware
 	ginRouter.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:50000", "http://127.0.0.1:50000"},
+		AllowOrigins: []string{
+			"http://localhost:5173",
+			"http://127.0.0.1:5173",
+			"http://localhost:50000",
+			"http://127.0.0.1:50000",
+			"*",
+			"https://bozo.mateusbento.com",
+			"http://bozo.mateusbento.com",
+		},
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		AllowCredentials: true,
@@ -92,6 +100,10 @@ func RunServer() {
 		chatUsecase.HandleWebSocket(ctx)
 	})
 
+	ginRouter.GET("/api/v1/health", func(ctx *gin.Context) {
+		ctx.String(http.StatusOK, "OK")
+	})
+
 	ginRouter.GET("/health", func(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "OK")
 	})
@@ -100,7 +112,7 @@ func RunServer() {
 		handler.ServeHTTP(ctx.Writer, ctx.Request)
 	})
 
-	listener, err := net.Listen("tcp", "0.0.0.0:8080")
+	listener, err := net.Listen("tcp4", "0.0.0.0:8080")
 	if err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
