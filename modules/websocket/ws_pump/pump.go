@@ -27,27 +27,28 @@ type Pump struct {
 }
 
 func (p *Pump) Start() {
-	go p.WritePump()
-	go p.ReadPump()
+	go p.writePump()
+	go p.readPump()
 }
 
-// ReadPump handles reading messages from a client
-func (p *Pump) ReadPump() {
+// readPump handles reading messages from a client
+func (p *Pump) readPump() {
 	defer func() {
 		p.Unregister <- struct{}{}
 		p.conn.Close()
 	}()
 
-	p.conn.SetReadLimit(maxMessageSize)
+	// p.conn.SetReadLimit(maxMessageSize)
+	p.conn.SetReadLimit(4) //ping
 	p.conn.SetReadDeadline(time.Time{})
 
 	for {
 		_, msg, err := p.conn.ReadMessage()
 		if err != nil {
-			if websocket.IsUnexpectedCloseError(err,
-				websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-				fmt.Println(err)
-			}
+			// if websocket.IsUnexpectedCloseError(err,
+			// 	websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
+			// }
+			fmt.Println(err)
 			break
 		}
 		if string(msg) == "PONG" {
@@ -78,8 +79,8 @@ func (c *Pump) writeMessage(message []byte) error {
 	return nil
 }
 
-// WritePump handles sending messages to a client
-func (c *Pump) WritePump() {
+// writePump handles sending messages to a client
+func (c *Pump) writePump() {
 	ticker := time.NewTicker(time.Second * 10)
 	defer func() {
 		fmt.Println("Closing WritePump")

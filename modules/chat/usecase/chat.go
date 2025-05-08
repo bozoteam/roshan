@@ -22,7 +22,6 @@ import (
 
 type ChatUsecase struct {
 	hub            *models.Hub
-	upgrader       *websocket.Upgrader
 	logger         *slog.Logger
 	jwtRepository  *jwtRepository.JWTRepository
 	userRepository *userRepository.UserRepository
@@ -33,7 +32,6 @@ func NewChatUsecase(userRepository *userRepository.UserRepository, jwtRepository
 	go hub.Run()
 	return &ChatUsecase{
 		hub:            hub,
-		upgrader:       new(websocket.Upgrader),
 		logger:         log.LogWithModule("chat_usecase"),
 		userRepository: userRepository,
 		jwtRepository:  jwtRepository,
@@ -195,9 +193,15 @@ func (u *ChatUsecase) HandleWebSocket(ctx *gin.Context) {
 	}
 
 	// Allow all origins for the WebSocket upgrade
-	u.upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	upgrader := websocket.Upgrader{
+		HandshakeTimeout:  time.Second * 5,
+		ReadBufferSize:    1024,
+		WriteBufferSize:   1024,
+		CheckOrigin:       func(r *http.Request) bool { return true },
+		EnableCompression: false,
+	}
 
-	conn, err := u.upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
+	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
 		u.logger.Error("Failed to upgrade connection", "error", err)
 		return

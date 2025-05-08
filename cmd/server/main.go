@@ -79,17 +79,23 @@ func RunServer() {
 
 	ginRouter := gin.Default()
 
-	// add cors middleware
-	ginRouter.Use(cors.New(cors.Config{
-		AllowOrigins: []string{
+	allowedOrigins := []string{
+		"https://bozo.mateusbento.com",
+	}
+
+	if helpers.IsDevelopment {
+		allowedOrigins = append(allowedOrigins, []string{
 			"http://localhost:5173",
 			"http://127.0.0.1:5173",
 			"http://localhost:50000",
 			"http://127.0.0.1:50000",
-			"*",
-			"https://bozo.mateusbento.com",
 			"http://bozo.mateusbento.com",
-		},
+		}...)
+	}
+
+	// add cors middleware
+	ginRouter.Use(cors.New(cors.Config{
+		AllowOrigins:     allowedOrigins,
 		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE"},
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		AllowCredentials: true,
