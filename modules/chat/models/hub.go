@@ -5,7 +5,7 @@ import (
 	"time"
 
 	userModel "github.com/bozoteam/roshan/modules/user/models"
-	"github.com/gorilla/websocket"
+	"github.com/bozoteam/roshan/modules/websocket/ws_client"
 )
 
 // Message represents a chat message
@@ -23,23 +23,12 @@ type Event struct {
 	Timestamp int64             `json:"timestamp"`
 }
 
-// Client represents a connected user
-type Client struct {
-	*userModel.User
-	Conn       *websocket.Conn `json:"-"`
-	Send       chan []byte     `json:"-"`
-	RoomID     string          `json:"-"`
-	Unregister chan<- *Client  `json:"-"`
-	PingNotify chan struct{}   `json:"-"`
-}
-
 // Room represents a chat room
 type Room struct {
 	ID         string
-	FriendlyId string
 	Name       string
 	CreatorID  string
-	Clients    map[string]*Client
+	Clients    map[string]*ws_client.Client
 	emptyTimer *time.Timer
 }
 
@@ -49,8 +38,8 @@ type Hub struct {
 	rooms map[string]*Room
 
 	// Channels for operations
-	register         chan *clientRegistration
-	unregister       chan *clientUnregistration
+	register         chan *ws_client.ClientRegistration
+	unregister       chan *ws_client.ClientUnregistration
 	broadcastMessage chan *sendMessage
 	broadcastEvent   chan *Event
 	createRoom       chan *createRoom
@@ -59,25 +48,13 @@ type Hub struct {
 	listRooms        chan *roomsRequest
 }
 
-// NewClient creates a new client
-func NewClient(user *userModel.User, conn *websocket.Conn, roomID string, unregister chan<- *Client) *Client {
-	return &Client{
-		PingNotify: make(chan struct{}),
-		User:       user,
-		Conn:       conn,
-		Send:       make(chan []byte, 1024),
-		RoomID:     roomID,
-		Unregister: unregister,
-	}
-}
-
 // NewHub creates a new hub
 func NewHub() *Hub {
 	return &Hub{
 		rooms: make(map[string]*Room),
 
-		register:   make(chan *clientRegistration),
-		unregister: make(chan *clientUnregistration),
+		register:   make(chan *ws_client.ClientRegistration),
+		unregister: make(chan *ws_client.ClientUnregistration),
 
 		broadcastMessage: make(chan *sendMessage),
 		broadcastEvent:   make(chan *Event),

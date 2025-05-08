@@ -42,6 +42,7 @@ func RunServer() {
 		panic(err)
 	}
 	fmt.Println(blacklistedPaths)
+	fmt.Printf("Is development=%v\n", helpers.IsDevelopment)
 
 	db := database.GetDBConnection()
 	userRepository := userRepository.NewUserRepository(db)

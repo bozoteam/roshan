@@ -6,18 +6,20 @@ import (
 	"maps"
 	"slices"
 	"time"
+
+	"github.com/bozoteam/roshan/modules/websocket/ws_client"
 )
 
-func (h *Hub) handleRegister(reg *clientRegistration) {
+func (h *Hub) handleRegister(reg *ws_client.ClientRegistration) {
 	fmt.Printf("Registration request for room: %s, client: %s\n", reg.RoomID, reg.Client.User.Id)
 	room, exists := h.rooms[reg.RoomID]
 	if !exists {
-		reg.result <- nil
+		reg.Result <- nil
 		return
 	}
 	// Add client to room
 	if room.Clients == nil {
-		room.Clients = make(map[string]*Client)
+		room.Clients = make(map[string]*ws_client.Client)
 	}
 	room.Clients[reg.Client.User.Id] = reg.Client
 
@@ -30,10 +32,10 @@ func (h *Hub) handleRegister(reg *clientRegistration) {
 	// Send current user list after a client joins
 	h.sendUserList(room)
 
-	reg.result <- reg.Client
+	reg.Result <- reg.Client
 }
 
-func (h *Hub) handleUnregister(unreg *clientUnregistration) {
+func (h *Hub) handleUnregister(unreg *ws_client.ClientUnregistration) {
 	fmt.Printf("Unregistration request for client: %s, room: %s\n", unreg.Client.Id, unreg.RoomID)
 	// If specific room provided
 	if room, ok := h.rooms[unreg.RoomID]; ok {
@@ -54,7 +56,7 @@ func (h *Hub) handleUnregister(unreg *clientUnregistration) {
 		}
 	}
 
-	unreg.result <- unreg.Client
+	unreg.Result <- unreg.Client
 }
 
 func (h *Hub) handleCreateRoom(create *createRoom) {

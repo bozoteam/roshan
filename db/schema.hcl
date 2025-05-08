@@ -39,3 +39,36 @@ table "user" {
     columns = [column.id]
   }
 }
+
+# enum "game" {
+#   schema = schema.public
+#   values = ["tic_tac_toc"]
+# }
+
+# table "room" {
+#   schema = schema.public
+#   column "id" {
+#     type     = uuid
+#     null     = false
+#   }
+#   column "game_type" {
+#     type = game
+#     null = false
+#   }
+# }
+
+# table "room_users" {
+#   schema = schema.public
+#   column "id" {
+#     type     = uuid
+#     null     = false
+#   }
+#   column "room_id" {
+#     type     = uuid
+#     null = false
+#   }
+#   column "user_id" {
+#     type     = uuid
+#     null = false
+#   }
+# }

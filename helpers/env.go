@@ -8,7 +8,8 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var IsDevelopment bool = true
+var development = "true"
+var IsDevelopment bool = development == "true"
 
 func LoadDotEnv() {
 	file := ".env"

@@ -1,21 +1,5 @@
 package models
 
-// clientRegistration holds data for registering a client to a room
-type clientRegistration struct {
-	Client *Client
-	RoomID string
-
-	result chan *Client
-}
-
-// clientUnregistration holds data for unregistering a client
-type clientUnregistration struct {
-	Client *Client
-	RoomID string
-
-	result chan *Client
-}
-
 // roomRequest is used to safely get room data
 type roomRequest struct {
 	id string

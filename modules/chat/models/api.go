@@ -1,26 +1,28 @@
 package models
 
+import "github.com/bozoteam/roshan/modules/websocket/ws_client"
+
 // Register adds a client to a room
-func (h *Hub) Register(client *Client, roomID string) *Client {
-	result := make(chan *Client)
-	h.register <- &clientRegistration{
+func (h *Hub) Register(client *ws_client.Client, roomID string) *ws_client.Client {
+	result := make(chan *ws_client.Client)
+	h.register <- &ws_client.ClientRegistration{
 		Client: client,
 		RoomID: roomID,
 
-		result: result,
+		Result: result,
 	}
 
 	return <-result
 }
 
 // Unregister removes a client from a room
-func (h *Hub) Unregister(client *Client, roomID string) *Client {
-	result := make(chan *Client)
-	h.unregister <- &clientUnregistration{
+func (h *Hub) Unregister(client *ws_client.Client, roomID string) *ws_client.Client {
+	result := make(chan *ws_client.Client)
+	h.unregister <- &ws_client.ClientUnregistration{
 		Client: client,
 		RoomID: roomID,
 
-		result: result,
+		Result: result,
 	}
 
 	return <-result

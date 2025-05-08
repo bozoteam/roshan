@@ -1,4 +1,4 @@
-package models
+package ws_pump
 
 import (
 	"errors"
@@ -8,22 +8,41 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+func NewPump(conn *websocket.Conn, sendChan chan []byte) *Pump {
+	return &Pump{
+		conn:       conn,
+		send:       sendChan,
+		pingNotify: make(chan struct{}),
+
+		Unregister: make(chan struct{}),
+	}
+}
+
+type Pump struct {
+	conn       *websocket.Conn
+	send       chan []byte
+	pingNotify chan struct{}
+
+	Unregister chan struct{}
+}
+
+func (p *Pump) Start() {
+	go p.WritePump()
+	go p.ReadPump()
+}
+
 // ReadPump handles reading messages from a client
-func (c *Client) ReadPump(hub *Hub) {
+func (p *Pump) ReadPump() {
 	defer func() {
-		c.Unregister <- c
-		c.Conn.Close()
+		p.Unregister <- struct{}{}
+		p.conn.Close()
 	}()
 
-	c.Conn.SetReadLimit(maxMessageSize)
-	c.Conn.SetReadDeadline(time.Time{})
-	// c.Conn.SetPongHandler(func(string) error {
-	// 	c.Conn.SetReadDeadline(time.Now().Add(pongWait))
-	// 	return nil
-	// })
+	p.conn.SetReadLimit(maxMessageSize)
+	p.conn.SetReadDeadline(time.Time{})
 
 	for {
-		_, msg, err := c.Conn.ReadMessage()
+		_, msg, err := p.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err,
 				websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
@@ -33,37 +52,25 @@ func (c *Client) ReadPump(hub *Hub) {
 		}
 		if string(msg) == "PONG" {
 			fmt.Println("Received PONG")
-			c.PingNotify <- struct{}{}
+			p.pingNotify <- struct{}{}
 			continue
 		}
 		if string(msg) == "PING" {
 			fmt.Println("Received PING")
-			c.writeMessage([]byte("PONG"), true)
+			p.writeMessage([]byte("PONG"))
 			fmt.Println("SENDING PONG")
 		}
 	}
 }
 
-func (c *Client) writeMessage(message []byte, ok bool) error {
-	c.Conn.SetWriteDeadline(time.Now().Add(writeWait))
-	if !ok {
-		// The hub closed the channel
-		c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
-		return errors.New("hub closed the channel")
-	}
+func (c *Pump) writeMessage(message []byte) error {
+	c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 
-	w, err := c.Conn.NextWriter(websocket.TextMessage)
+	w, err := c.conn.NextWriter(websocket.TextMessage)
 	if err != nil {
 		return err
 	}
 	w.Write(message)
-
-	// Add queued messages to the current websocket message
-	n := len(c.Send)
-	for range n {
-		w.Write(newline)
-		w.Write(<-c.Send)
-	}
 
 	if err := w.Close(); err != nil {
 		return err
@@ -72,36 +79,42 @@ func (c *Client) writeMessage(message []byte, ok bool) error {
 }
 
 // WritePump handles sending messages to a client
-func (c *Client) WritePump(hub *Hub) {
+func (c *Pump) WritePump() {
 	ticker := time.NewTicker(time.Second * 10)
 	defer func() {
 		fmt.Println("Closing WritePump")
 		ticker.Stop()
-		c.Conn.Close()
+		c.conn.Close()
 	}()
 
 	for {
 		select {
-		case message, ok := <-c.Send:
-			err := c.writeMessage(message, ok)
+		case message, ok := <-c.send:
+			if !ok {
+				// The hub closed the channel
+				c.conn.WriteMessage(websocket.CloseMessage, []byte("CLOSED"))
+				fmt.Println(errors.New("hub closed the channel"))
+				return
+			}
+			err := c.writeMessage(message)
 			if err != nil {
 				fmt.Println("Error writing message:", err)
 				return
 			}
 
 		case <-ticker.C:
-			fmt.Println("Sending ping")
-			err := c.writeMessage([]byte("PING"), true)
+			fmt.Println("sending ping")
+			err := c.writeMessage([]byte("PING"))
 			if err != nil {
 				fmt.Println("Error sending ping:", err)
 				return
 			}
 			select {
-			case <-c.PingNotify:
+			case <-c.pingNotify:
 				continue
 			case <-time.After(time.Second * 5):
 				fmt.Println("Ping timeout")
-				c.Conn.WriteMessage(websocket.CloseMessage, []byte{})
+				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
 				return
 			}
 		}
@@ -116,13 +129,9 @@ const (
 	// Time allowed to read the next pong message from the peer
 	pongWait = 5 * time.Second
 
-	// Send pings to peer with this period
+	// send pings to peer with this period
 	pingPeriod = (pongWait * 9) / 10
 
 	// Maximum message size allowed from peer
 	maxMessageSize = 1024
-)
-
-var (
-	newline = []byte{'\n'}
 )

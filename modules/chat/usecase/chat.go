@@ -13,6 +13,7 @@ import (
 	"github.com/bozoteam/roshan/modules/chat/models"
 	userModel "github.com/bozoteam/roshan/modules/user/models"
 	userRepository "github.com/bozoteam/roshan/modules/user/repository"
+	"github.com/bozoteam/roshan/modules/websocket/ws_client"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"google.golang.org/grpc/codes"
@@ -111,7 +112,7 @@ func (u *ChatUsecase) CreateRoom(ctx context.Context, name string) (*models.Room
 		ID:        uuid,
 		Name:      name,
 		CreatorID: user.Id,
-		Clients:   make(map[string]*models.Client),
+		Clients:   make(map[string]*ws_client.Client),
 	}
 
 	u.hub.CreateRoom(room)
@@ -202,15 +203,11 @@ func (u *ChatUsecase) HandleWebSocket(ctx *gin.Context) {
 		return
 	}
 
-	// Create unregister channel
-	unregister := make(chan *models.Client)
-
 	// Create client
-	client := models.NewClient(user, conn, roomID, unregister)
+	client := ws_client.NewClient(conn, user, roomID)
 
 	// Start goroutines for reading and writing
-	go client.ReadPump(u.hub)
-	go client.WritePump(u.hub)
+	client.Pump.Start()
 
 	// Register client to room
 	u.hub.Register(client, roomID)
@@ -219,7 +216,7 @@ func (u *ChatUsecase) HandleWebSocket(ctx *gin.Context) {
 
 	// Handle unregistration when the client disconnects
 	// This runs in the same goroutine as HandleWebSocket
-	clientToUnregister := <-unregister
-	u.hub.Unregister(clientToUnregister, roomID)
+	<-client.Pump.Unregister
+	u.hub.Unregister(client, roomID)
 	u.logger.Info("User disconnected from room", "user_id", user.Id, "room_id", roomID)
 }

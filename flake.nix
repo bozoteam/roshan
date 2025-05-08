@@ -52,7 +52,7 @@
           subPackages = [ "cmd/server" ];
           vendorHash = "sha256-xq9JZUv65tubmr5DIPUsqEYrF+Uw4F/rn7lyyt0IfRw=";
           ldflags = [
-            "-X helpers.IsDevelopment=false"
+            "-X github.com/bozoteam/roshan/helpers.development=false"
           ];
         };
         roshanDockerImage =
