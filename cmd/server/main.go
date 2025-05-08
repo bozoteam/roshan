@@ -91,6 +91,7 @@ func RunServer() {
 			"http://127.0.0.1:50000",
 			"http://bozo.mateusbento.com",
 		}...)
+		allowedOrigins = append(allowedOrigins, strings.Split(helpers.GetEnv("CORS_ALLOWED_ORIGINS"), ",")...)
 	}
 
 	// add cors middleware
