@@ -81,11 +81,11 @@ func RunServer() {
 
 	allowedOrigins := []string{
 		"https://bozo.mateusbento.com",
+		"http://localhost:5173",
 	}
 
 	if helpers.IsDevelopment {
 		allowedOrigins = append(allowedOrigins, []string{
-			"http://localhost:5173",
 			"http://127.0.0.1:5173",
 			"http://localhost:50000",
 			"http://127.0.0.1:50000",
