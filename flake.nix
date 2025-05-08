@@ -6,7 +6,7 @@
     self.submodules = true;
   };
   outputs =
-    {
+    inputs@{
       self,
       nixpkgs,
       flake-utils,
