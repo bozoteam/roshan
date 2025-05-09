@@ -54,6 +54,7 @@
           ldflags = [
             "-X github.com/bozoteam/roshan/helpers.development=false"
           ];
+          env.CGO_ENABLED = 0;
         };
         roshanDockerImage =
           let
