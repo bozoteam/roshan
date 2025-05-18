@@ -1,9 +1,14 @@
 package models
 
 import (
-	"fmt"
+	"bytes"
+	"encoding/gob"
+	"encoding/json"
+	"sync"
 	"time"
 
+	"github.com/bozoteam/roshan/helpers"
+	"github.com/bozoteam/roshan/modules/user/models"
 	userModel "github.com/bozoteam/roshan/modules/user/models"
 	"github.com/bozoteam/roshan/modules/websocket/ws_client"
 )
@@ -25,95 +30,176 @@ type Event struct {
 
 // Room represents a chat room
 type Room struct {
-	ID         string
-	Name       string
-	CreatorID  string
-	Clients    map[string]*ws_client.Client
-	emptyTimer *time.Timer
+	ID        string
+	Name      string
+	CreatorID string
+	Clients   map[string]*ws_client.Client
+
+	someoneEntered bool
+	// mu         *sync.RWMutex // Add mutex for individual room
+}
+
+func (r *Room) Clone() *Room {
+	var buf bytes.Buffer
+	enc := gob.NewEncoder(&buf)
+	dec := gob.NewDecoder(&buf)
+
+	err := enc.Encode(r)
+	if err != nil {
+		panic(err)
+	}
+
+	var result Room
+	err = dec.Decode(&result)
+	if err != nil {
+		panic(err)
+	}
+
+	return &result
+}
+
+func NewRoom(name string, creatorId string) *Room {
+	return &Room{
+		someoneEntered: false,
+
+		ID:        helpers.GenUUID(),
+		Name:      name,
+		CreatorID: creatorId,
+		Clients:   make(map[string]*ws_client.Client),
+	}
 }
 
 // Hub manages all rooms and connections
 type Hub struct {
-	// Rooms indexed by ID
 	rooms map[string]*Room
-
-	// Channels for operations
-	register         chan *ws_client.ClientRegistration
-	unregister       chan *ws_client.ClientUnregistration
-	broadcastMessage chan *sendMessage
-	broadcastEvent   chan *Event
-	createRoom       chan *createRoom
-	deleteRoom       chan *deleteRoom
-	getRoom          chan *roomRequest
-	listRooms        chan *roomsRequest
+	mu    *sync.RWMutex // Changed from pointer to embedded, using RWMutex
 }
 
 // NewHub creates a new hub
 func NewHub() *Hub {
 	return &Hub{
-		rooms: make(map[string]*Room),
-
-		register:   make(chan *ws_client.ClientRegistration),
-		unregister: make(chan *ws_client.ClientUnregistration),
-
-		broadcastMessage: make(chan *sendMessage),
-		broadcastEvent:   make(chan *Event),
-
-		createRoom: make(chan *createRoom),
-		deleteRoom: make(chan *deleteRoom),
-		getRoom:    make(chan *roomRequest),
-		listRooms:  make(chan *roomsRequest),
+		rooms: make(map[string]*Room, 1024),
+		mu:    new(sync.RWMutex),
 	}
 }
 
-// Run starts the hub's main loop
-func (h *Hub) Run() {
-	for {
-		fmt.Println("ready to consume again")
+func (h *Hub) GetRoom(roomId string) *Room {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	room, exists := h.rooms[roomId]
+	if !exists {
+		return nil
+	}
+
+	return room.Clone()
+}
+
+func (h *Hub) DeleteRoom(roomId string) {
+	h.mu.Lock()
+	delete(h.rooms, roomId)
+	h.mu.Unlock()
+}
+
+func (h *Hub) CreateRoom(room *Room) {
+	h.mu.Lock()
+	h.rooms[room.ID] = room
+	h.mu.Unlock()
+
+	go func() {
+		<-time.NewTimer(time.Second * 5).C
+		h.mu.RLock()
+		entered := room.someoneEntered
+		id := room.ID
+		h.mu.RUnlock()
+		if entered == false {
+			h.DeleteRoom(id)
+		}
+	}()
+}
+
+func (h *Hub) ListRooms() []*Room {
+	h.mu.RLock()
+	rooms := make([]*Room, 0, len(h.rooms))
+	for _, room := range h.rooms {
+		rooms = append(rooms, room.Clone())
+	}
+	h.mu.RUnlock()
+
+	return rooms
+}
+
+func (h *Hub) Register(client *ws_client.Client, roomId string) {
+	h.mu.Lock()
+	room, exists := h.rooms[roomId]
+	room.someoneEntered = true
+	if !exists {
+		h.mu.Unlock()
+		return
+	}
+	room.Clients[client.Id] = client
+	h.mu.Unlock()
+
+	h.sendUserList(roomId)
+}
+
+func (h *Hub) Unregister(client *ws_client.Client, roomId string) {
+	h.mu.Lock()
+	room, exists := h.rooms[roomId]
+	if !exists {
+		h.mu.Unlock()
+		return
+	}
+	delete(room.Clients, client.Id)
+	if len(room.Clients) == 0 {
+		delete(h.rooms, roomId)
+	}
+	h.mu.Unlock()
+
+	h.sendUserList(roomId)
+}
+
+func (h *Hub) BroadcastBytes(roomId string, data []byte) {
+	h.mu.RLock()
+	room, exists := h.rooms[roomId]
+	if !exists {
+		h.mu.RUnlock()
+		return
+	}
+	chans := make([](chan []byte), 0, len(room.Clients))
+	for _, client := range room.Clients {
+		chans = append(chans, client.GetSender())
+	}
+	h.mu.RUnlock()
+
+	for _, c := range chans {
 		select {
-		case reg := <-h.register:
-			h.handleRegister(reg)
-
-		case unreg := <-h.unregister:
-			h.handleUnregister(unreg)
-
-		case create := <-h.createRoom:
-			h.handleCreateRoom(create)
-
-		case roomID := <-h.deleteRoom:
-			h.handleDeleteRoom(roomID)
-
-		case msg := <-h.broadcastMessage:
-			h.handleMessage(msg)
-
-		case event := <-h.broadcastEvent:
-			h.handleEvent(event)
-
-		case req := <-h.getRoom:
-			h.handleGetRoom(req)
-
-		case req := <-h.listRooms:
-			h.handleListRooms(req)
+		case c <- data:
+		default:
 		}
 	}
 }
 
-// sendUserList sends the current user list to all clients in a room
-func (h *Hub) sendUserList(room *Room) {
-	users := make([]*userModel.User, 0, len(room.Clients))
-	for clientId, client := range room.Clients {
-		users = append(users, &userModel.User{
-			Id:    clientId,
-			Name:  client.Name,
-			Email: client.Email,
-		})
+func (h *Hub) sendUserList(roomId string) {
+	h.mu.RLock()
+	room, exists := h.rooms[roomId]
+	if !exists {
+		h.mu.RUnlock()
+		return
 	}
+	clients := make([]*models.User, 0, len(room.Clients))
+	for _, client := range room.Clients {
+		clients = append(clients, client.User.Clone())
+	}
+	h.mu.RUnlock()
 
-	event := &Event{
+	data, err := json.Marshal(&Event{
 		RoomID:    room.ID,
-		Users:     users,
+		Users:     clients,
 		Timestamp: time.Now().UnixNano(),
+	})
+	if err != nil {
+		return
 	}
 
-	h.handleEvent(event)
+	go h.BroadcastBytes(room.ID, data)
 }

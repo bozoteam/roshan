@@ -7,12 +7,14 @@ import (
 
 	"context"
 
+	"encoding/json"
+
 	log "github.com/bozoteam/roshan/adapter/log"
-	"github.com/bozoteam/roshan/helpers"
 	jwtRepository "github.com/bozoteam/roshan/modules/auth/repository/jwt"
 	"github.com/bozoteam/roshan/modules/chat/models"
 	userModel "github.com/bozoteam/roshan/modules/user/models"
 	userRepository "github.com/bozoteam/roshan/modules/user/repository"
+	ws_hub "github.com/bozoteam/roshan/modules/websocket/hub"
 	"github.com/bozoteam/roshan/modules/websocket/ws_client"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -21,7 +23,7 @@ import (
 )
 
 type ChatUsecase struct {
-	hub            *models.Hub
+	hub            ws_hub.WsHub
 	logger         *slog.Logger
 	jwtRepository  *jwtRepository.JWTRepository
 	userRepository *userRepository.UserRepository
@@ -29,7 +31,7 @@ type ChatUsecase struct {
 
 func NewChatUsecase(userRepository *userRepository.UserRepository, jwtRepository *jwtRepository.JWTRepository) *ChatUsecase {
 	hub := models.NewHub()
-	go hub.Run()
+	// go hub.Run()
 	return &ChatUsecase{
 		hub:            hub,
 		logger:         log.LogWithModule("chat_usecase"),
@@ -40,25 +42,10 @@ func NewChatUsecase(userRepository *userRepository.UserRepository, jwtRepository
 
 // RoomResponse represents a chat room with its users
 type RoomResponse struct {
-	Id        string `json:"id" example:"f81d4fae-7dec-11d0-a765-00a0c91e6bf6"`
-	Name      string `json:"name" example:"General Discussion"`
+	Id        string
+	Name      string
 	CreatorId string
-	Users     []*userModel.User `json:"users"`
-}
-
-// RoomCreateRequest represents data needed to create a chat room
-type RoomCreateRequest struct {
-	RoomName string `json:"room_name" binding:"required" example:"General Discussion"`
-}
-
-// RoomCreateResponse represents the response after creating a room
-type RoomCreateResponse struct {
-	Id string `json:"id" example:"f81d4fae-7dec-11d0-a765-00a0c91e6bf6"`
-}
-
-// MessageRequest represents the structure of a chat message
-type MessageRequest struct {
-	Message string `json:"message" binding:"required" example:"Hello, everyone!"`
+	Users     []*userModel.User
 }
 
 var (
@@ -96,22 +83,20 @@ func (u *ChatUsecase) SendMessage(ctx context.Context, content string, roomId st
 		Timestamp: time.Now().UnixNano(),
 	}
 
+	data, err := json.Marshal(message)
+	if err != nil {
+		return err
+	}
+
 	// Broadcast the message
-	u.hub.BroadcastMessage(message)
+	go u.hub.BroadcastBytes(roomId, data)
 	return nil
 }
 
 func (u *ChatUsecase) CreateRoom(ctx context.Context, name string) (*models.Room, error) {
 	user := ctx.Value("user").(*userModel.User)
 
-	uuid := helpers.GenUUID()
-
-	room := &models.Room{
-		ID:        uuid,
-		Name:      name,
-		CreatorID: user.Id,
-		Clients:   make(map[string]*ws_client.Client),
-	}
+	room := models.NewRoom(name, user.Id)
 
 	u.hub.CreateRoom(room)
 
@@ -158,7 +143,7 @@ func (u *ChatUsecase) DeleteRoom(ctx context.Context, roomId string) (*RoomRespo
 		users = append(users, user.User)
 	}
 
-	u.hub.DeleteRoom(room)
+	u.hub.DeleteRoom(room.ID)
 
 	return &RoomResponse{
 		Id:        room.ID,
@@ -210,9 +195,6 @@ func (u *ChatUsecase) HandleWebSocket(ctx *gin.Context) {
 	// Create client
 	client := ws_client.NewClient(conn, user, roomID)
 
-	// Start goroutines for reading and writing
-	client.Pump.Start()
-
 	// Register client to room
 	u.hub.Register(client, roomID)
 
@@ -220,7 +202,7 @@ func (u *ChatUsecase) HandleWebSocket(ctx *gin.Context) {
 
 	// Handle unregistration when the client disconnects
 	// This runs in the same goroutine as HandleWebSocket
-	<-client.Pump.Unregister
+	client.WaitUnregister()
 	u.hub.Unregister(client, roomID)
 	u.logger.Info("User disconnected from room", "user_id", user.Id, "room_id", roomID)
 }

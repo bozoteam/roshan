@@ -1,7 +1,6 @@
 package ws_pump
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -58,7 +57,10 @@ func (p *Pump) readPump() {
 		}
 		if string(msg) == "PING" {
 			fmt.Println("Received PING")
-			p.writeMessage([]byte("PONG"))
+			err := p.writeMessage([]byte("PONG"))
+			if err != nil {
+				break
+			}
 			fmt.Println("SENDING PONG")
 		}
 	}
@@ -71,7 +73,11 @@ func (c *Pump) writeMessage(message []byte) error {
 	if err != nil {
 		return err
 	}
-	w.Write(message)
+
+	_, err = w.Write(message)
+	if err != nil {
+		return err
+	}
 
 	if err := w.Close(); err != nil {
 		return err
@@ -93,14 +99,14 @@ func (c *Pump) writePump() {
 		case message, ok := <-c.send:
 			if !ok {
 				// The hub closed the channel
-				c.conn.WriteMessage(websocket.CloseMessage, []byte("CLOSED"))
-				fmt.Println(errors.New("hub closed the channel"))
-				return
+				// c.conn.WriteMessage(websocket.CloseMessage, []byte("CLOSED"))
+				// fmt.Println(errors.New("hub closed the channel"))
+				break
 			}
 			err := c.writeMessage(message)
 			if err != nil {
 				fmt.Println("Error writing message:", err)
-				return
+				break
 			}
 
 		case <-ticker.C:
@@ -108,7 +114,7 @@ func (c *Pump) writePump() {
 			err := c.writeMessage([]byte("PING"))
 			if err != nil {
 				fmt.Println("Error sending ping:", err)
-				return
+				break
 			}
 			select {
 			case <-c.pingNotify:

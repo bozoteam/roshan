@@ -22,7 +22,7 @@ while true
     sleep 1
 end
 
-./migrate.fish; or cleanup
-./apply.fish; or cleanup
+./dev/migrate.fish; or cleanup
+./dev/apply.fish; or cleanup
 
-go run ./cmd/server/main.go; or cleanup
+go run -race ./cmd/server/main.go; or cleanup

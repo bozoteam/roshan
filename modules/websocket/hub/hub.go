@@ -6,7 +6,14 @@ import (
 )
 
 type WsHub interface {
-	Register(client *ws_client.Client, roomID string) *ws_client.Client
-	Unregister(client *ws_client.Client, roomID string) *ws_client.Client
-	GetRoom(id string) *models.Room
+	Register(client *ws_client.Client, roomID string)
+	Unregister(client *ws_client.Client, roomID string)
+
+	CreateRoom(room *models.Room)
+	DeleteRoom(roomId string)
+
+	GetRoom(roomId string) *models.Room
+	ListRooms() []*models.Room
+
+	BroadcastBytes(roomId string, data []byte)
 }
