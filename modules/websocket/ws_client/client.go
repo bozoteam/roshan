@@ -39,6 +39,13 @@ func NewClient(conn *websocket.Conn, user *userModel.User, roomID string) *Clien
 	return c
 }
 
+func (c *Client) GetID() string {
+	return c.Id
+}
+func (c *Client) GetUser() *userModel.User {
+	return c.User
+}
+
 // ClientRegistration holds data for registering a client to a room
 type ClientRegistration struct {
 	Client *Client

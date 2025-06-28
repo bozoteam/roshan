@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"strconv"
 	"strings"
+	"time"
 
 	"google.golang.org/grpc/encoding"
 
@@ -53,6 +55,7 @@ func RunServer() {
 	userUsecase := userUsecase.NewUserUsecase(db)
 
 	authInterceptor := authMiddleware.UnaryInterceptor
+	httpMiddleware := authMiddleware.AuthMiddleware
 
 	encoding.RegisterCodec(vanguardgrpc.NewCodec(&vanguard.JSONCodec{
 		MarshalOptions:   protojson.MarshalOptions{EmitUnpopulated: true, UseProtoNames: true},
@@ -101,13 +104,29 @@ func RunServer() {
 		AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
 		AllowCredentials: true,
 	}))
-	// }
 
-	ginRouter.GET("/api/v1/chat/rooms/:id/ws", func(ctx *gin.Context) {
-		chatUsecase.HandleWebSocket(ctx)
+	ginRouter.GET("/roshan/version", func(ctx *gin.Context) {
+		a, err := strconv.Atoi(helpers.BuildTime)
+		if err != nil {
+			panic(err)
+		}
+		ctx.JSON(200, gin.H{
+			"unix": helpers.BuildTime,
+			"date": time.Unix(int64(a), 0),
+		})
+	})
+
+	wsEnd := ginRouter.Group("/api/v1", httpMiddleware())
+	wsEnd.GET("/chat/rooms/:id/ws", func(ctx *gin.Context) {
+		roomID := ctx.Param("id")
+		chatUsecase.JoinRoom(ctx, roomID)
 	})
 
 	ginRouter.GET("/api/v1/health", func(ctx *gin.Context) {
+		ctx.String(http.StatusOK, "OK")
+	})
+
+	ginRouter.GET("/roshan/health", func(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "OK")
 	})
 

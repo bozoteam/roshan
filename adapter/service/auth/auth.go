@@ -37,29 +37,32 @@ func genAuthResponseFromToken(token *usecase.TokenResponse) *gen.AuthenticateRes
 	}
 }
 
-func (s *AuthService) setRefreshTokenCookie(ctx context.Context, token string, expiration uint64) {
+func (s *AuthService) setAuthCookie(ctx context.Context, respToken *usecase.TokenResponse) {
 	md := metadata.Pairs(
-		"Set-Cookie", fmt.Sprintf("refresh_token=%s; HttpOnly; SameSite=Strict; Path=/api; Max-Age=%d",
-			token,
-			expiration,
+		"Set-Cookie", fmt.Sprintf("access_token=%s; HttpOnly; SameSite=Strict; Path=/api; Max-Age=%d",
+			respToken.AccessToken,
+			respToken.ExpiresIn,
+		),
+		"Set-Cookie", fmt.Sprintf("refresh_token=%s; HttpOnly; SameSite=Strict; Path=/api/v1/auth/refresh; Max-Age=%d",
+			respToken.RefreshToken,
+			respToken.RefreshExpiresIn,
 		),
 		"Cache-Control", "no-store",
 	)
 	if err := grpc.SetHeader(ctx, md); err != nil {
 		s.logger.Error("Failed to set cookie header", "error", err)
 	}
-
 }
 
-func (s *AuthService) deleteRefreshTokenCookie(ctx context.Context) {
+func (s *AuthService) deleteAuthCookie(ctx context.Context) {
 	md := metadata.Pairs(
-		"Set-Cookie", fmt.Sprintf("refresh_token=\"\"; HttpOnly; SameSite=Strict; Path=/api; Max-Age=0"),
+		"Set-Cookie", fmt.Sprintf("access_token=deleted; HttpOnly; SameSite=Strict; Path=/api; Max-Age=0"),
+		"Set-Cookie", fmt.Sprintf("refresh_token=deleted; HttpOnly; SameSite=Strict; Path=/api/v1/auth/refresh; Max-Age=0"),
 		"Cache-Control", "no-store",
 	)
 	if err := grpc.SetHeader(ctx, md); err != nil {
 		s.logger.Error("Failed to set cookie header", "error", err)
 	}
-
 }
 
 func (s *AuthService) Authenticate(ctx context.Context, req *gen.AuthenticateRequest) (*gen.AuthenticateResponse, error) {
@@ -68,7 +71,7 @@ func (s *AuthService) Authenticate(ctx context.Context, req *gen.AuthenticateReq
 		return nil, err
 	}
 
-	s.setRefreshTokenCookie(ctx, tokenData.RefreshToken, tokenData.RefreshExpiresIn)
+	s.setAuthCookie(ctx, tokenData)
 
 	return genAuthResponseFromToken(tokenData), nil
 }
@@ -115,7 +118,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, req *gen.RefreshTokenReq
 		return nil, err
 	}
 
-	s.setRefreshTokenCookie(ctx, tokenData.RefreshToken, tokenData.RefreshExpiresIn)
+	s.setAuthCookie(ctx, tokenData)
 
 	return genAuthResponseFromToken(tokenData), nil
 }
@@ -123,7 +126,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, req *gen.RefreshTokenReq
 func (s *AuthService) Logout(ctx context.Context, req *gen.LogoutRequest) (*gen.LogoutResponse, error) {
 	s.authUsecase.Logout(ctx)
 
-	s.deleteRefreshTokenCookie(ctx)
+	s.deleteAuthCookie(ctx)
 
 	return &gen.LogoutResponse{}, nil
 }

@@ -18,6 +18,12 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
 
+        buildTime = builtins.readFile (
+          pkgs.runCommand "build-time" { } ''
+            date +%s > $out
+          ''
+        );
+
         ship = pkgs.mkShell {
           packages = [
             pkgs.openssh
@@ -50,9 +56,10 @@
           version = "0.1.0";
           src = ./.;
           subPackages = [ "cmd/server" ];
-          vendorHash = "sha256-C50XwYtCaUxzfMqO4RrakzCQi8BHD+NfU26VSNkkM3M=";
+          vendorHash = "sha256-leD7Bd/ALhguDaKtsKGdbJUSK/w6tcmCjggah+uBt9U=";
           ldflags = [
             "-X github.com/bozoteam/roshan/helpers.development=false"
+            "-X github.com/bozoteam/roshan/helpers.BuildTime=${buildTime}"
           ];
           env.CGO_ENABLED = 0;
         };

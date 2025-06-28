@@ -1,10 +1,9 @@
 package models
 
 import (
-	"bytes"
-	"encoding/gob"
 	"time"
 
+	"github.com/bozoteam/roshan/helpers"
 	"github.com/go-playground/validator/v10"
 )
 
@@ -19,23 +18,10 @@ type User struct {
 	UpdatedAt    time.Time `json:"-"`
 }
 
+var _ helpers.Cloneable[User] = (*User)(nil)
+
 func (u *User) Clone() *User {
-	var buf bytes.Buffer
-	enc := gob.NewEncoder(&buf)
-	dec := gob.NewDecoder(&buf)
-
-	err := enc.Encode(u)
-	if err != nil {
-		panic(err)
-	}
-
-	var result User
-	err = dec.Decode(&result)
-	if err != nil {
-		panic(err)
-	}
-
-	return &result
+	return helpers.Clone(u)
 }
 
 var modelValidator = validator.New()

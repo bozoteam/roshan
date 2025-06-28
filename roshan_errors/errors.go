@@ -10,11 +10,21 @@ var (
 	// ErrInvalidInput        = errors.New("invalid input")
 	// ErrInternalServerError = errors.New("internal server error")
 
-	ErrInvalidRequest      = status.Error(codes.InvalidArgument, "invalid request")
-	ErrInternalServerError = status.Error(codes.Internal, "internal server error")
+	ErrInvalidRequestMsg = "invalid request"
+	ErrInvalidRequest    = status.Error(codes.InvalidArgument, ErrInvalidRequestMsg)
 
-	ErrInvalidToken     = status.Error(codes.Unauthenticated, "invalid token")
-	ErrWrongTokenFormat = status.Error(codes.Unauthenticated, "wrong token format")
-	ErrMissingToken     = status.Error(codes.Unauthenticated, "missing token")
-	ErrAuthFailed       = status.Error(codes.Unauthenticated, "authentication failed")
+	ErrInternalServerErrorMsg = "internal server error"
+	ErrInternalServerError    = status.Error(codes.Internal, ErrInternalServerErrorMsg)
+
+	ErrInvalidTokenMsg = "invalid token"
+	ErrInvalidToken    = status.Error(codes.Unauthenticated, ErrInvalidRequestMsg)
+
+	ErrWrongTokenFormatMsg = "wrong token format"
+	ErrWrongTokenFormat    = status.Error(codes.Unauthenticated, ErrWrongTokenFormatMsg)
+
+	ErrMissingTokenMsg = "missing token"
+	ErrMissingToken    = status.Error(codes.Unauthenticated, ErrMissingTokenMsg)
+
+	ErrAuthFailedMsg = "authentication failed"
+	ErrAuthFailed    = status.Error(codes.Unauthenticated, ErrAuthFailedMsg)
 )

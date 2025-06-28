@@ -12,6 +12,8 @@ import (
 	log "github.com/bozoteam/roshan/adapter/log"
 	jwtRepository "github.com/bozoteam/roshan/modules/auth/repository/jwt"
 	"github.com/bozoteam/roshan/modules/chat/models"
+	chatModel "github.com/bozoteam/roshan/modules/chat/models"
+
 	userModel "github.com/bozoteam/roshan/modules/user/models"
 	userRepository "github.com/bozoteam/roshan/modules/user/repository"
 	ws_hub "github.com/bozoteam/roshan/modules/websocket/hub"
@@ -23,14 +25,17 @@ import (
 )
 
 type ChatUsecase struct {
-	hub            ws_hub.WsHub
+	hub            *ws_hub.Hub
 	logger         *slog.Logger
 	jwtRepository  *jwtRepository.JWTRepository
 	userRepository *userRepository.UserRepository
 }
 
-func NewChatUsecase(userRepository *userRepository.UserRepository, jwtRepository *jwtRepository.JWTRepository) *ChatUsecase {
-	hub := models.NewHub()
+func NewChatUsecase(
+	userRepository *userRepository.UserRepository,
+	jwtRepository *jwtRepository.JWTRepository,
+) *ChatUsecase {
+	hub := ws_hub.NewHub()
 	// go hub.Run()
 	return &ChatUsecase{
 		hub:            hub,
@@ -62,16 +67,7 @@ func (u *ChatUsecase) SendMessage(ctx context.Context, content string, roomId st
 		return ErrRoomNotFound
 	}
 
-	// Check if user is in room
-	foundUser := false
-	for _, client := range room.Clients {
-		if client.User.Id == user.Id {
-			foundUser = true
-			break
-		}
-	}
-
-	if !foundUser {
+	if room.UserIsInRoom(user.Id) == false {
 		return ErrUserNotFoundInRoom
 	}
 
@@ -107,10 +103,11 @@ func (u *ChatUsecase) ListRooms(ctx context.Context) ([]*RoomResponse, error) {
 	rooms := u.hub.ListRooms()
 
 	responseRooms := make([]*RoomResponse, 0, len(rooms))
-	for _, room := range rooms {
+	for _, _room := range rooms {
+		room := _room.(*chatModel.Room)
 		users := make([]*userModel.User, 0, len(room.Clients))
 		for _, client := range room.Clients {
-			users = append(users, client.User)
+			users = append(users, client.GetUser())
 		}
 
 		responseRoom := &RoomResponse{
@@ -129,7 +126,7 @@ func (u *ChatUsecase) ListRooms(ctx context.Context) ([]*RoomResponse, error) {
 func (u *ChatUsecase) DeleteRoom(ctx context.Context, roomId string) (*RoomResponse, error) {
 	user := ctx.Value("user").(*userModel.User)
 
-	room := u.hub.GetRoom(roomId)
+	room := u.hub.GetRoom(roomId).(*chatModel.Room)
 	if room == nil {
 		return nil, ErrRoomNotFound
 	}
@@ -140,7 +137,7 @@ func (u *ChatUsecase) DeleteRoom(ctx context.Context, roomId string) (*RoomRespo
 
 	users := make([]*userModel.User, 0, len(room.Clients))
 	for _, user := range room.Clients {
-		users = append(users, user.User)
+		users = append(users, user.GetUser())
 	}
 
 	u.hub.DeleteRoom(room.ID)
@@ -153,23 +150,8 @@ func (u *ChatUsecase) DeleteRoom(ctx context.Context, roomId string) (*RoomRespo
 	}, nil
 }
 
-func (u *ChatUsecase) HandleWebSocket(ctx *gin.Context) {
-	roomID := ctx.Param("id")
-	token, ok := ctx.GetQuery("token")
-	if !ok {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Token is required"})
-		return
-	}
-	_, claims, err := u.jwtRepository.ValidateToken(token, jwtRepository.ACCESS_TOKEN)
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-		return
-	}
-	user, err := u.userRepository.FindUserById(claims.Subject)
-	if err != nil {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
-		return
-	}
+func (u *ChatUsecase) JoinRoom(ctx *gin.Context, roomID string) {
+	user := ctx.MustGet("user").(*userModel.User)
 
 	room := u.hub.GetRoom(roomID)
 	if room == nil {

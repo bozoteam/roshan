@@ -9,6 +9,7 @@ import (
 )
 
 var development = "true"
+var BuildTime = "0"
 var IsDevelopment bool = development == "true"
 
 func LoadDotEnv() {
