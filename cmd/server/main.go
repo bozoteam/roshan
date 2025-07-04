@@ -17,15 +17,18 @@ import (
 	database "github.com/bozoteam/roshan/adapter/database"
 	authGen "github.com/bozoteam/roshan/adapter/grpc/gen/auth"
 	chatGen "github.com/bozoteam/roshan/adapter/grpc/gen/chat"
+	gameGen "github.com/bozoteam/roshan/adapter/grpc/gen/game"
 	userGen "github.com/bozoteam/roshan/adapter/grpc/gen/user"
 	auth_service "github.com/bozoteam/roshan/adapter/service/auth"
 	chat_service "github.com/bozoteam/roshan/adapter/service/chat"
+	game_service "github.com/bozoteam/roshan/adapter/service/game"
 	user_service "github.com/bozoteam/roshan/adapter/service/user"
 	"github.com/bozoteam/roshan/helpers"
 	"github.com/bozoteam/roshan/modules/auth/middlewares"
 	jwtRepository "github.com/bozoteam/roshan/modules/auth/repository/jwt"
 	authUsecase "github.com/bozoteam/roshan/modules/auth/usecase"
 	chatUsecase "github.com/bozoteam/roshan/modules/chat/usecase"
+	gameUsecase "github.com/bozoteam/roshan/modules/game/usecase"
 	userRepository "github.com/bozoteam/roshan/modules/user/repository"
 	userUsecase "github.com/bozoteam/roshan/modules/user/usecase"
 	"github.com/gin-contrib/cors"
@@ -53,6 +56,7 @@ func RunServer() {
 	authMiddleware := middlewares.NewAuthMiddleware(jwtRepository, userRepository, blacklistedPaths)
 	chatUsecase := chatUsecase.NewChatUsecase(userRepository, jwtRepository)
 	userUsecase := userUsecase.NewUserUsecase(db)
+	gameUsecase := gameUsecase.NewGameUsecase()
 
 	authInterceptor := authMiddleware.UnaryInterceptor
 	httpMiddleware := authMiddleware.AuthMiddleware
@@ -69,10 +73,12 @@ func RunServer() {
 	authService := auth_service.NewAuthService(authUsecase)
 	userService := user_service.NewUserService(userUsecase)
 	chatService := chat_service.NewChatService(chatUsecase)
+	gameService := game_service.NewGameService(gameUsecase)
 
 	authGen.RegisterAuthServiceServer(server, authService)
 	userGen.RegisterUserServiceServer(server, userService)
 	chatGen.RegisterChatServiceServer(server, chatService)
+	gameGen.RegisterGameServiceServer(server, gameService)
 
 	handler, err := vanguardgrpc.NewTranscoder(server)
 	if err != nil {
@@ -116,12 +122,7 @@ func RunServer() {
 		})
 	})
 
-	wsEnd := ginRouter.Group("/api/v1", httpMiddleware())
-	wsEnd.GET("/chat/rooms/:id/ws", func(ctx *gin.Context) {
-		roomID := ctx.Param("id")
-		chatUsecase.JoinRoom(ctx, roomID)
-	})
-
+	// health --------------------------------------------------
 	ginRouter.GET("/api/v1/health", func(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "OK")
 	})
@@ -132,6 +133,17 @@ func RunServer() {
 
 	ginRouter.GET("/health", func(ctx *gin.Context) {
 		ctx.String(http.StatusOK, "OK")
+	})
+	// --------------------------------------------------------
+
+	wsEnd := ginRouter.Group("/api/v1", httpMiddleware())
+	wsEnd.GET("/chat/rooms/:id/ws", func(ctx *gin.Context) {
+		roomID := ctx.Param("id")
+		chatUsecase.JoinRoom(ctx, roomID)
+	})
+	wsEnd.GET("/game/rooms/:id/ws", func(ctx *gin.Context) {
+		roomID := ctx.Param("id")
+		gameUsecase.JoinRoom(ctx, roomID, "TEAM_1")
 	})
 
 	ginRouter.NoRoute(func(ctx *gin.Context) {

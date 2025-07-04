@@ -2,21 +2,21 @@ package ws_hub
 
 import (
 	"encoding/json"
+	"maps"
+	"slices"
 	"sync"
 	"time"
 
-	"github.com/bozoteam/roshan/modules/user/models"
+	"github.com/bozoteam/roshan/helpers"
 	userModel "github.com/bozoteam/roshan/modules/user/models"
 )
 
-// Event represents a room event (like user list updates)
-type Event struct {
-	RoomID    string            `json:"room_id"`
-	Users     []*userModel.User `json:"users"`
-	Timestamp int64             `json:"timestamp"`
+type ClientTeam struct {
+	ClientI
+	Team string // Team the client belongs to
 }
 
-// ClientI defines the interface for clients
+// ClintI defines the interface for clients
 type ClientI interface {
 	GetID() string
 	GetSender() chan []byte
@@ -27,12 +27,15 @@ type ClientI interface {
 // RoomI defines the interface for rooms
 type RoomI interface {
 	GetID() string
-	GetClients() map[string]ClientI
+	GetClients() map[string]ClientTeam
 	SetSomeoneEntered(bool)
 	GetSomeoneEntered() bool
-	UserIsInRoom(userId string) bool
-
 	Clone() RoomI
+	UserIsInRoom(userId string) bool
+	GetClientsFromTeam(team string) []ClientTeam
+	GetTeamMapping() map[string][]ClientTeam
+	RegisterClient(client ClientI, team string)
+	UnregisterClient(id string)
 }
 
 // Hub manages all rooms and connections
@@ -52,6 +55,7 @@ func NewHub() *Hub {
 func (h *Hub) GetRoom(roomId string) RoomI {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
+
 	room, exists := h.rooms[roomId]
 	if !exists {
 		return nil
@@ -83,16 +87,12 @@ func (h *Hub) CreateRoom(room RoomI) {
 }
 
 func (h *Hub) ListRooms() []RoomI {
-	rooms := make([]RoomI, 0, len(h.rooms))
 	h.mu.RLock()
-	for _, room := range h.rooms {
-		rooms = append(rooms, room.Clone())
-	}
-	h.mu.RUnlock()
-	return rooms
+	defer h.mu.RUnlock()
+	return slices.Collect(maps.Values(helpers.Clone(h.rooms)))
 }
 
-func (h *Hub) Register(client ClientI, roomId string) {
+func (h *Hub) Register(client ClientI, roomId string, team string) {
 	h.mu.Lock()
 	room, exists := h.rooms[roomId]
 	if !exists {
@@ -102,7 +102,16 @@ func (h *Hub) Register(client ClientI, roomId string) {
 
 	room.SetSomeoneEntered(true)
 	clients := room.GetClients()
-	clients[client.GetID()] = client
+	clients[client.GetID()] = ClientTeam{
+		ClientI: client,
+		Team:    team,
+	}
+
+	teamMap := room.GetTeamMapping()
+	teamMap[team] = append(teamMap[team], ClientTeam{
+		ClientI: client,
+		Team:    team,
+	})
 	h.mu.Unlock()
 
 	h.sendUserList(roomId)
@@ -116,6 +125,7 @@ func (h *Hub) Unregister(client ClientI, roomId string) {
 		return
 	}
 
+	room.UnregisterClient(client.GetID())
 	clients := room.GetClients()
 	delete(clients, client.GetID())
 	if len(clients) == 0 {
@@ -138,6 +148,29 @@ func (h *Hub) BroadcastBytes(roomId string, data []byte) {
 	clients := room.GetClients()
 	chans := make([]chan []byte, 0, len(clients))
 	for _, client := range clients {
+		chans = append(chans, client.GetSender())
+	}
+	h.mu.RUnlock()
+
+	for _, c := range chans {
+		select {
+		case c <- data:
+		default:
+		}
+	}
+}
+
+func (h *Hub) SendBytesToTeam(roomId string, team string, data []byte) {
+	h.mu.RLock()
+	room, exists := h.rooms[roomId]
+	if !exists {
+		h.mu.RUnlock()
+		return
+	}
+
+	teamClients := room.GetClientsFromTeam(team)
+	chans := make([]chan []byte, 0, len(teamClients))
+	for _, client := range teamClients {
 		chans = append(chans, client.GetSender())
 	}
 	h.mu.RUnlock()
@@ -177,70 +210,11 @@ func (h *Hub) SendBytes(roomId string, clientId string, data []byte) bool {
 	}
 }
 
-// SendBytesToClients sends different data to specific clients in a room
-func (h *Hub) SendBytesToClients(roomId string, clientData map[string][]byte) {
-	h.mu.RLock()
-	room, exists := h.rooms[roomId]
-	if !exists {
-		h.mu.RUnlock()
-		return
-	}
-
-	clients := room.GetClients()
-
-	// Create a map of client senders
-	senders := make(map[string]chan []byte, len(clientData))
-	for clientId := range clientData {
-		if client, ok := clients[clientId]; ok {
-			senders[clientId] = client.GetSender()
-		}
-	}
-	h.mu.RUnlock()
-
-	// Send data to each client
-	for clientId, data := range clientData {
-		if sender, ok := senders[clientId]; ok {
-			select {
-			case sender <- data:
-			default:
-			}
-		}
-	}
-}
-
-// BroadcastBytesExcept sends data to all clients in a room except the specified ones
-func (h *Hub) BroadcastBytesExcept(roomId string, excludedClientIds []string, data []byte) {
-	h.mu.RLock()
-	room, exists := h.rooms[roomId]
-	if !exists {
-		h.mu.RUnlock()
-		return
-	}
-
-	clients := room.GetClients()
-
-	// Create exclude map for O(1) lookups
-	excludeMap := make(map[string]struct{}, len(excludedClientIds))
-	for _, id := range excludedClientIds {
-		excludeMap[id] = struct{}{}
-	}
-
-	// Collect senders for clients that aren't excluded
-	chans := make([]chan []byte, 0, len(clients))
-	for clientId, client := range clients {
-		if _, excluded := excludeMap[clientId]; !excluded {
-			chans = append(chans, client.GetSender())
-		}
-	}
-	h.mu.RUnlock()
-
-	// Send data
-	for _, c := range chans {
-		select {
-		case c <- data:
-		default:
-		}
-	}
+// RoomUserList represents a room event (like user list updates)
+type RoomUserList struct {
+	RoomID    string                       `json:"room_id"`
+	Teams     map[string][]*userModel.User `json:"team_mapping"`
+	Timestamp int64                        `json:"timestamp"`
 }
 
 func (h *Hub) sendUserList(roomId string) {
@@ -251,21 +225,26 @@ func (h *Hub) sendUserList(roomId string) {
 		return
 	}
 
-	clients := room.GetClients()
-	users := make([]*models.User, 0, len(clients))
-	for _, client := range clients {
-		users = append(users, client.GetUser().Clone())
+	tMap := room.GetTeamMapping()
+	output := make(map[string][]*userModel.User, len(tMap))
+	for team, clients := range tMap {
+		users := make([]*userModel.User, len(clients))
+		for i, client := range clients {
+			users[i] = client.GetUser()
+		}
+		output[team] = users
 	}
+
 	roomID := room.GetID()
 	h.mu.RUnlock()
 
-	data, err := json.Marshal(&Event{
+	data, err := json.Marshal(&RoomUserList{
 		RoomID:    roomID,
-		Users:     users,
+		Teams:     output,
 		Timestamp: time.Now().UnixNano(),
 	})
 	if err != nil {
-		return
+		panic(err)
 	}
 
 	go h.BroadcastBytes(roomID, data)

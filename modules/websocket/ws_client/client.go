@@ -9,18 +9,8 @@ import (
 // Client represents a connected user
 type Client struct {
 	*userModel.User
-	send   chan []byte `json:"-"`
-	RoomID string      `json:"-"`
-
+	send chan []byte   `json:"-"`
 	pump *ws_pump.Pump `json:"-"`
-}
-
-func (c *Client) WaitUnregister() {
-	<-c.pump.Unregister
-}
-
-func (c *Client) GetSender() chan []byte {
-	return c.send
 }
 
 // NewClient creates a new client
@@ -28,10 +18,9 @@ func NewClient(conn *websocket.Conn, user *userModel.User, roomID string) *Clien
 	send := make(chan []byte, 8)
 
 	c := &Client{
-		User:   user,
-		send:   send,
-		RoomID: roomID,
-		pump:   ws_pump.NewPump(conn, send),
+		User: user,
+		send: send,
+		pump: ws_pump.NewPump(conn, send),
 	}
 
 	c.pump.Start()
@@ -44,6 +33,12 @@ func (c *Client) GetID() string {
 }
 func (c *Client) GetUser() *userModel.User {
 	return c.User
+}
+func (c *Client) WaitUnregister() {
+	<-c.pump.Unregister
+}
+func (c *Client) GetSender() chan []byte {
+	return c.send
 }
 
 // ClientRegistration holds data for registering a client to a room

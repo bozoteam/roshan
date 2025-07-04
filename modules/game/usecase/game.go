@@ -3,41 +3,78 @@ package usecase
 import (
 	"context"
 	"log/slog"
+	"net/http"
+	"time"
 
 	"github.com/bozoteam/roshan/adapter/log"
-	jwtRepository "github.com/bozoteam/roshan/modules/auth/repository/jwt"
-	chatModel "github.com/bozoteam/roshan/modules/chat/models"
 	gameModel "github.com/bozoteam/roshan/modules/game/models"
 	userModel "github.com/bozoteam/roshan/modules/user/models"
-	userRepository "github.com/bozoteam/roshan/modules/user/repository"
 	ws_hub "github.com/bozoteam/roshan/modules/websocket/hub"
+	"github.com/bozoteam/roshan/modules/websocket/ws_client"
+	"github.com/gin-gonic/gin"
+	"github.com/gorilla/websocket"
 )
 
 type GameUsecase struct {
-	hub            *ws_hub.Hub
-	logger         *slog.Logger
-	jwtRepository  *jwtRepository.JWTRepository
-	userRepository *userRepository.UserRepository
+	hub    *ws_hub.Hub
+	logger *slog.Logger
 }
 
-func NewGameUsecase(
-	jwtRepository *jwtRepository.JWTRepository,
-	userRepository *userRepository.UserRepository,
-) *GameUsecase {
+func NewGameUsecase() *GameUsecase {
 	return &GameUsecase{
-		hub:            ws_hub.NewHub(),
-		logger:         log.LogWithModule("game_usecase"),
-		jwtRepository:  jwtRepository,
-		userRepository: userRepository,
+		hub:    ws_hub.NewHub(),
+		logger: log.LogWithModule("game_usecase"),
 	}
 }
 
-func (u *GameUsecase) CreateRoom(ctx context.Context, name string) *chatModel.Room {
+func (u *GameUsecase) CreateRoom(ctx context.Context, name string, game string) (*gameModel.GameRoom, error) {
 	user := ctx.Value("user").(*userModel.User)
 
-	room := gameModel.NewGameRoom(name, user.Id)
+	// TODO: validate game exists
+	room := gameModel.NewGameRoom(name, user.Id, game)
 
 	u.hub.CreateRoom(room)
 
-	return nil
+	return room, nil
+}
+
+func (u *GameUsecase) JoinRoom(ctx *gin.Context, roomID string, team string) {
+	user := ctx.MustGet("user").(*userModel.User)
+
+	room := u.hub.GetRoom(roomID)
+	if room == nil {
+		ctx.JSON(http.StatusNotFound, gin.H{"error": "Room not found"})
+		return
+	}
+
+	// TODO: validate team
+
+	// Allow all origins for the WebSocket upgrade
+	upgrader := websocket.Upgrader{
+		HandshakeTimeout:  time.Second * 5,
+		ReadBufferSize:    1024,
+		WriteBufferSize:   1024,
+		CheckOrigin:       func(r *http.Request) bool { return true },
+		EnableCompression: false,
+	}
+
+	conn, err := upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
+	if err != nil {
+		u.logger.Error("Failed to upgrade connection", "error", err)
+		return
+	}
+
+	// Create client
+	client := ws_client.NewClient(conn, user, roomID)
+
+	// Register client to room
+	u.hub.Register(client, roomID, team)
+
+	u.logger.Info("User connected to room", "user_id", user.Id, "room_id", roomID)
+
+	// Handle unregistration when the client disconnects
+	// This runs in the same goroutine as HandleWebSocket
+	client.WaitUnregister()
+	u.hub.Unregister(client, roomID)
+	u.logger.Info("User disconnected from room", "user_id", user.Id, "room_id", roomID)
 }

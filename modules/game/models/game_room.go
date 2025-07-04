@@ -1,32 +1,17 @@
 package models
 
 import (
-	"github.com/bozoteam/roshan/helpers"
-	"github.com/bozoteam/roshan/modules/websocket/ws_client"
+	"github.com/bozoteam/roshan/modules/chat/models"
 )
 
 type GameRoom struct {
-	ID        string
-	Name      string
-	CreatorID string
-	Clients   map[string]*ws_client.Client
-
-	someoneEntered bool
+	models.Room
+	Game string
 }
 
-var _ helpers.Cloneable[GameRoom] = (*GameRoom)(nil)
-
-func (r *GameRoom) Clone() *GameRoom {
-	return helpers.Clone(r)
-}
-
-func NewGameRoom(name string, creatorId string) *GameRoom {
+func NewGameRoom(name string, creatorId string, game string) *GameRoom {
 	return &GameRoom{
-		someoneEntered: false,
-
-		ID:        helpers.GenUUID(),
-		Name:      name,
-		CreatorID: creatorId,
-		Clients:   make(map[string]*ws_client.Client),
+		Room: *models.NewRoom(name, creatorId, []string{"team1", "team2", "all", "watcher"}),
+		Game: game,
 	}
 }

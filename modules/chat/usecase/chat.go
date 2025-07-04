@@ -92,7 +92,7 @@ func (u *ChatUsecase) SendMessage(ctx context.Context, content string, roomId st
 func (u *ChatUsecase) CreateRoom(ctx context.Context, name string) (*models.Room, error) {
 	user := ctx.Value("user").(*userModel.User)
 
-	room := models.NewRoom(name, user.Id)
+	room := models.NewRoom(name, user.Id, []string{"chat"})
 
 	u.hub.CreateRoom(room)
 
@@ -178,7 +178,7 @@ func (u *ChatUsecase) JoinRoom(ctx *gin.Context, roomID string) {
 	client := ws_client.NewClient(conn, user, roomID)
 
 	// Register client to room
-	u.hub.Register(client, roomID)
+	u.hub.Register(client, roomID, "chat")
 
 	u.logger.Info("User connected to room", "user_id", user.Id, "room_id", roomID)
 

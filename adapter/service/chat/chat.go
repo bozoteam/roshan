@@ -4,6 +4,7 @@ import (
 	"context"
 
 	gen "github.com/bozoteam/roshan/adapter/grpc/gen/chat"
+	commonGen "github.com/bozoteam/roshan/adapter/grpc/gen/common"
 	userGen "github.com/bozoteam/roshan/adapter/grpc/gen/user"
 	"github.com/bozoteam/roshan/modules/chat/usecase"
 )
@@ -35,7 +36,7 @@ func (s *ChatService) CreateRoom(ctx context.Context, req *gen.CreateRoomRequest
 	}
 
 	return &gen.CreateRoomResponse{
-		Room: &gen.Room{
+		Room: &commonGen.Room{
 			Name:      room.Name,
 			Id:        room.ID,
 			CreatorId: room.CreatorID,
@@ -50,7 +51,7 @@ func (s *ChatService) ListRooms(ctx context.Context, req *gen.ListRoomsRequest) 
 		return nil, err
 	}
 
-	outRooms := make([]*gen.Room, 0, len(rooms))
+	outRooms := make([]*commonGen.Room, 0, len(rooms))
 	for _, room := range rooms {
 		users := make([]*userGen.User, 0, len(room.Users))
 		for _, user := range room.Users {
@@ -61,7 +62,7 @@ func (s *ChatService) ListRooms(ctx context.Context, req *gen.ListRoomsRequest) 
 			})
 		}
 
-		outRooms = append(outRooms, &gen.Room{
+		outRooms = append(outRooms, &commonGen.Room{
 			Id:        room.Id,
 			CreatorId: room.CreatorId,
 			Users:     users,
@@ -91,7 +92,7 @@ func (s *ChatService) DeleteRoom(ctx context.Context, req *gen.DeleteRoomRequest
 	}
 
 	return &gen.DeleteRoomResponse{
-		Room: &gen.Room{
+		Room: &commonGen.Room{
 			Id:        room.Id,
 			CreatorId: room.CreatorId,
 			Users:     users,
