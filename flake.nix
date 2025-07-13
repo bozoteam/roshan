@@ -56,7 +56,7 @@
           version = "0.1.0";
           src = ./.;
           subPackages = [ "cmd/server" ];
-          vendorHash = "sha256-leD7Bd/ALhguDaKtsKGdbJUSK/w6tcmCjggah+uBt9U=";
+          vendorHash = "sha256-KyZmLUV5EDHEPOWiMyv78AmxGXcnZ7J4TmOomNvw1GM=";
           ldflags = [
             "-X github.com/bozoteam/roshan/helpers.development=false"
             "-X github.com/bozoteam/roshan/helpers.BuildTime=${buildTime}"

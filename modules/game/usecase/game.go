@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/bozoteam/roshan/adapter/log"
+	"github.com/bozoteam/roshan/modules/chat/models"
 	gameModel "github.com/bozoteam/roshan/modules/game/models"
 	userModel "github.com/bozoteam/roshan/modules/user/models"
 	ws_hub "github.com/bozoteam/roshan/modules/websocket/hub"
@@ -20,6 +21,10 @@ type GameUsecase struct {
 	logger *slog.Logger
 }
 
+type GameRoomResponse struct {
+	*models.Room
+}
+
 func NewGameUsecase() *GameUsecase {
 	return &GameUsecase{
 		hub:    ws_hub.NewHub(),
@@ -27,7 +32,7 @@ func NewGameUsecase() *GameUsecase {
 	}
 }
 
-func (u *GameUsecase) CreateRoom(ctx context.Context, name string, game string) (*gameModel.GameRoom, error) {
+func (u *GameUsecase) CreateRoom(ctx context.Context, name string, game string) (*GameRoomResponse, error) {
 	user := ctx.Value("user").(*userModel.User)
 
 	// TODO: validate game exists
@@ -35,7 +40,9 @@ func (u *GameUsecase) CreateRoom(ctx context.Context, name string, game string) 
 
 	u.hub.CreateRoom(room)
 
-	return room, nil
+	return &GameRoomResponse{
+		Room: room,
+	}, nil
 }
 
 func (u *GameUsecase) JoinRoom(ctx *gin.Context, roomID string, team string) {
@@ -77,4 +84,18 @@ func (u *GameUsecase) JoinRoom(ctx *gin.Context, roomID string, team string) {
 	client.WaitUnregister()
 	u.hub.Unregister(client, roomID)
 	u.logger.Info("User disconnected from room", "user_id", user.Id, "room_id", roomID)
+}
+
+func (u *GameUsecase) ListRooms(ctx context.Context) ([]*GameRoomResponse, error) {
+	rooms := u.hub.ListRooms()
+
+	responseRooms := make([]*GameRoomResponse, 0, len(rooms))
+	for _, room := range rooms {
+		responseRooms = append(responseRooms, &GameRoomResponse{
+			Room: room.(*models.Room),
+		},
+		)
+	}
+
+	return responseRooms, nil
 }

@@ -45,12 +45,9 @@ func NewChatUsecase(
 	}
 }
 
-// RoomResponse represents a chat room with its users
-type RoomResponse struct {
-	Id        string
-	Name      string
-	CreatorId string
-	Users     []*userModel.User
+// ChatRoomResponse represents a chat room with its users
+type ChatRoomResponse struct {
+	*models.Room
 }
 
 var (
@@ -89,41 +86,33 @@ func (u *ChatUsecase) SendMessage(ctx context.Context, content string, roomId st
 	return nil
 }
 
-func (u *ChatUsecase) CreateRoom(ctx context.Context, name string) (*models.Room, error) {
+func (u *ChatUsecase) CreateRoom(ctx context.Context, name string) (*ChatRoomResponse, error) {
 	user := ctx.Value("user").(*userModel.User)
 
-	room := models.NewRoom(name, user.Id, []string{"chat"})
+	room := models.NewRoom(name, user.Id, []string{"chat"}, "chat")
 
 	u.hub.CreateRoom(room)
 
-	return room, nil
+	return &ChatRoomResponse{
+		Room: room,
+	}, nil
 }
 
-func (u *ChatUsecase) ListRooms(ctx context.Context) ([]*RoomResponse, error) {
+func (u *ChatUsecase) ListRooms(ctx context.Context) ([]*ChatRoomResponse, error) {
 	rooms := u.hub.ListRooms()
 
-	responseRooms := make([]*RoomResponse, 0, len(rooms))
-	for _, _room := range rooms {
-		room := _room.(*chatModel.Room)
-		users := make([]*userModel.User, 0, len(room.Clients))
-		for _, client := range room.Clients {
-			users = append(users, client.GetUser())
-		}
-
-		responseRoom := &RoomResponse{
-			CreatorId: room.CreatorID,
-			Id:        room.ID,
-			Name:      room.Name,
-			Users:     users,
-		}
-
-		responseRooms = append(responseRooms, responseRoom)
+	responseRooms := make([]*ChatRoomResponse, 0, len(rooms))
+	for _, room := range rooms {
+		responseRooms = append(responseRooms, &ChatRoomResponse{
+			Room: room.(*models.Room),
+		},
+		)
 	}
 
 	return responseRooms, nil
 }
 
-func (u *ChatUsecase) DeleteRoom(ctx context.Context, roomId string) (*RoomResponse, error) {
+func (u *ChatUsecase) DeleteRoom(ctx context.Context, roomId string) (*ChatRoomResponse, error) {
 	user := ctx.Value("user").(*userModel.User)
 
 	room := u.hub.GetRoom(roomId).(*chatModel.Room)
@@ -135,18 +124,10 @@ func (u *ChatUsecase) DeleteRoom(ctx context.Context, roomId string) (*RoomRespo
 		return nil, ErrUserNotCreator
 	}
 
-	users := make([]*userModel.User, 0, len(room.Clients))
-	for _, user := range room.Clients {
-		users = append(users, user.GetUser())
-	}
-
 	u.hub.DeleteRoom(room.ID)
 
-	return &RoomResponse{
-		Id:        room.ID,
-		Name:      room.Name,
-		CreatorId: room.CreatorID,
-		Users:     users,
+	return &ChatRoomResponse{
+		Room: room,
 	}, nil
 }
 

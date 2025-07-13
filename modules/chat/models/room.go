@@ -1,14 +1,28 @@
 package models
 
 import (
+	"encoding/gob"
 	"slices"
+
+	commonGen "github.com/bozoteam/roshan/adapter/grpc/gen/common"
+	userGen "github.com/bozoteam/roshan/adapter/grpc/gen/user"
 
 	"github.com/bozoteam/roshan/helpers"
 	ws_hub "github.com/bozoteam/roshan/modules/websocket/hub"
+	"github.com/bozoteam/roshan/modules/websocket/ws_client"
 )
+
+func init() {
+	gob.Register((*Room)(nil)) // Register pointer type
+	gob.Register((*ws_hub.RoomI)(nil))
+	gob.Register((*ws_hub.ClientI)(nil))
+	gob.Register((*ws_client.Client)(nil))
+}
 
 type Team = string
 type UUID = string
+
+var _ ws_hub.RoomI = (*Room)(nil) // Correct - pointer implements interface
 
 // Room implements the RoomI interface for chat rooms
 type Room struct {
@@ -21,10 +35,12 @@ type Room struct {
 
 	Teams []string
 
+	Kind string
+
 	someoneEntered bool
 }
 
-func NewRoom(name string, creatorId string, teams []string) *Room {
+func NewRoom(name string, creatorId string, teams []string, kind string) *Room {
 	return &Room{
 		ID:          helpers.GenUUID(),
 		Name:        name,
@@ -32,6 +48,7 @@ func NewRoom(name string, creatorId string, teams []string) *Room {
 		Clients:     make(map[string]ws_hub.ClientTeam),
 		ClientTeams: make(map[Team][]ws_hub.ClientTeam),
 		Teams:       teams,
+		Kind:        kind,
 
 		someoneEntered: false,
 	}
@@ -91,4 +108,43 @@ func (r *Room) Clone() ws_hub.RoomI {
 func (r *Room) UserIsInRoom(userId string) bool {
 	_, exists := r.Clients[userId]
 	return exists
+}
+
+func (r *Room) ToGRPCRoom() *commonGen.Room {
+	teamUserMap := make(map[string]*commonGen.UserList)
+
+	for team, clients := range r.ClientTeams {
+		userList := &commonGen.UserList{
+			Users: make([]*userGen.User, len(clients)),
+		}
+		for i, client := range clients {
+			userList.Users[i] = &userGen.User{
+				Id:    client.GetID(),
+				Name:  client.GetUser().Name,
+				Email: client.GetUser().Email,
+			}
+		}
+		teamUserMap[team] = userList
+	}
+
+	kind := commonGen.RoomKind_ROOM_KIND_UNSPECIFIED
+
+	switch r.Kind {
+	case "chat":
+		kind = commonGen.RoomKind_ROOM_KIND_CHAT
+	case "game":
+		kind = commonGen.RoomKind_ROOM_KIND_GAME
+	default:
+		kind = commonGen.RoomKind_ROOM_KIND_UNSPECIFIED
+
+	}
+
+	return &commonGen.Room{
+		Id:           r.ID,
+		CreatorId:    r.CreatorID,
+		Name:         r.Name,
+		AllowedTeams: r.Teams,
+		TeamUserMap:  teamUserMap,
+		Kind:         kind,
+	}
 }

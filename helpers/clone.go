@@ -5,9 +5,9 @@ import (
 	"encoding/gob"
 )
 
-type Pointer[T any] interface {
-	*T
-}
+// type Pointer[T any] interface {
+// 	*T
+// }
 
 func Clone[T any](r T) T {
 	var buf bytes.Buffer
